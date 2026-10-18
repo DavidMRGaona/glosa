@@ -18,49 +18,49 @@ _rc_esc() {
 }
 
 _rc_dump() {
-    local rc="$1" name decl i len
+    local _rc_rc="$1" _rc_name _rc_decl _rc_i _rc_len
     trap - EXIT
     set +eu
     exec 1>&3 2>&4
-    printf 'exit=%s\n' "$rc"
-    for name in ${GLOSA_DUMP:-}; do
-        decl="$(declare -p "$name" 2>/dev/null)"
-        if [[ -z "$decl" ]]; then
-            printf '%s=<unset>\n' "$name"
-        elif [[ "$decl" == "declare -a"* ]]; then
-            eval "len=\${#${name}[@]}"
-            printf '%s[]=%s\n' "$name" "$len"
-            i=0
-            while (( i < len )); do
-                eval "printf '%s[%s]=%s\n' \"\$name\" \"\$i\" \"\$(_rc_esc \"\${${name}[$i]}\")\""
-                i=$((i + 1))
+    printf 'exit=%s\n' "$_rc_rc"
+    for _rc_name in ${GLOSA_DUMP:-}; do
+        _rc_decl="$(declare -p "$_rc_name" 2>/dev/null)"
+        if [[ -z "$_rc_decl" ]]; then
+            printf '%s=<unset>\n' "$_rc_name"
+        elif [[ "$_rc_decl" == "declare -a"* ]]; then
+            eval "_rc_len=\${#${_rc_name}[@]}"
+            printf '%s[]=%s\n' "$_rc_name" "$_rc_len"
+            _rc_i=0
+            while (( _rc_i < _rc_len )); do
+                eval "printf '%s[%s]=%s\n' \"\$_rc_name\" \"\$_rc_i\" \"\$(_rc_esc \"\${${_rc_name}[$_rc_i]}\")\""
+                _rc_i=$((_rc_i + 1))
             done
         else
-            printf '%s=%s\n' "$name" "$(_rc_esc "${!name}")"
+            printf '%s=%s\n' "$_rc_name" "$(_rc_esc "${!_rc_name}")"
         fi
     done
-    exit "$rc"
+    exit "$_rc_rc"
 }
 
-mode="$1"
-help="$2"
+_rc_mode="$1"
+_rc_help="$2"
 shift 2
 
 exec 3>&1 4>&2 1>"${GLOSA_OUT:-/dev/null}" 2>"${GLOSA_ERR:-/dev/null}"
 trap '_rc_dump $?' EXIT
 
-case "$mode" in
+case "$_rc_mode" in
     cli)
-        _rc_code="$("${GLOSA_TEST_BASH:-bash}" "$GLOSA" -h "$help" : "$@")" || true
+        _rc_code="$("${GLOSA_TEST_BASH:-bash}" "$GLOSA" -h "$_rc_help" : "$@")" || true
         eval "$_rc_code"
         ;;
     src)
         # shellcheck source=/dev/null
         source "$GLOSA"
-        glosa::parse "$help" "$@"
+        glosa::parse "$_rc_help" "$@"
         ;;
     *)
-        printf 'run_case: unknown mode %s\n' "$mode" >&2
+        printf 'run_case: unknown mode %s\n' "$_rc_mode" >&2
         exit 99
         ;;
 esac

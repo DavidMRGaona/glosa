@@ -1,6 +1,6 @@
 exit=0
 _a=false
 _b=false
-FILE=
-out=
-x=2
+FILE=f.txt
+out=p
+x=0

@@ -1,10 +1,10 @@
-exit=127
+exit=0
 _t=false
 _v=0
 add=false
 file=a.txt
-name=name
-output=<unset>
+name[]=0
+output=x.txt
 port=8080
 quiet=false
 rest[]=0

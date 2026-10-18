@@ -2,4 +2,4 @@ exit=0
 _q=false
 _v=false
 file[]=0
-x=-v
+x=x
