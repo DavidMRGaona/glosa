@@ -1,0 +1,9 @@
+Show open files
+
+Usage:
+  watcher
+  watcher --watch
+
+Options:
+  -h --help   Show this screen.
+  -w --watch  Keep watching

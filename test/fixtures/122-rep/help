@@ -1,0 +1,2 @@
+Usage:
+  prog [--file=<f>...] [-v | -q] [<x>]

@@ -1,0 +1,5 @@
+Small store helper.
+
+Usage:
+  store list_items
+  store purge [<optional_path_file>]

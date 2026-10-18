@@ -1,0 +1,6 @@
+exit=0
+_a=false
+_b=false
+FILE=f.txt
+out=p
+x=0

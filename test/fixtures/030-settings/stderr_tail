@@ -1,0 +1,4 @@
+Usage:
+  settings view_changed
+  settings export [<path_to>]
+  settings import [<path_from>]

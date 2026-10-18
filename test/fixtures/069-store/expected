@@ -1,0 +1,4 @@
+exit=0
+list_items=false
+optional_path_file=a b
+purge=true

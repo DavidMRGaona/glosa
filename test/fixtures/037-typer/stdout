@@ -1,0 +1,7 @@
+Type slowly
+
+Usage:
+   typer <text> <speed_in_ms>
+
+Examples:
+  typer 'some text' 100

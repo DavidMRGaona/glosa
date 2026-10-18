@@ -1,0 +1,5 @@
+Usage:
+  shellhelp optimize
+  shellhelp test_speed
+  shellhelp reload
+  shellhelp clean_cache

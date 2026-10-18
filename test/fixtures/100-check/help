@@ -1,0 +1,5 @@
+Check files
+
+Usage:
+  check
+  check [--fix] [--all]

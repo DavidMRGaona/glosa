@@ -1,0 +1,7 @@
+exit=0
+_h=false
+args[]=1
+args[0]=-x
+command=cmd
+context=ctx
+help=false

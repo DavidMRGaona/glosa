@@ -1,0 +1,14 @@
+Usage:
+  prog [options] <file>
+  prog serve [--port=<p>] [-v...]
+  prog (add | rm) <name>...
+  prog [-tw] -- <rest>...
+
+Options:
+  -o FILE --output=FILE  Output file [default: out.txt]
+  -q --quiet             Quiet
+  --verbose-mode         Verbose
+  -t                     T flag
+  -w --watch             Watch
+  -v                     Verbosity
+  --port=<p>             Port [default: 8080]

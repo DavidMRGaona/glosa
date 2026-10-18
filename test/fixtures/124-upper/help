@@ -1,0 +1,3 @@
+Usage:
+  prog FILE [--out=PATH] [-a | -b]
+  prog x x

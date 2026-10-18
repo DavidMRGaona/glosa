@@ -1,0 +1,14 @@
+exit=127
+_t=false
+_v=<unset>
+add=<unset>
+file=serve
+name=name
+output=out.txt
+port=9
+quiet=false
+rest[]=0
+rm=false
+serve=false
+verbose_mode=false
+watch=false

@@ -1,0 +1,6 @@
+exit=0
+export=true
+import=false
+path_from=
+path_to=/x
+view_changed=false

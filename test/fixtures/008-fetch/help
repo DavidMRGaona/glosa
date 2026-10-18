@@ -1,0 +1,4 @@
+Fetch a package
+
+Usage:
+  fetch <package_name> [--skip-setup]

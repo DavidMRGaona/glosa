@@ -1,0 +1,9 @@
+Resize a picture keeping the original
+
+Usage:
+  resize <file>
+  resize <file> --small
+
+Options:
+  -h --help   Show this screen.
+  -s --small  Make it small

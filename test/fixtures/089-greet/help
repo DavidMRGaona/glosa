@@ -1,0 +1,7 @@
+Prints a greeting
+
+Usage:
+  greet <name>
+
+Examples:
+  greet world

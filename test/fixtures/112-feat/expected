@@ -1,0 +1,14 @@
+exit=127
+_t=false
+_v=<unset>
+add=false
+file=a.txt
+name=name
+output=y
+port=8080
+quiet=false
+rest[]=0
+rm=false
+serve=false
+verbose_mode=<unset>
+watch=false
