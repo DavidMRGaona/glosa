@@ -184,3 +184,11 @@ $FEAT_OPTIONS"
     [ "$_glosa_err_code" -eq 2 ]
     [ "$_glosa_err_msg" = "invalid variable name '_glosa_x'" ]
 }
+
+@test "repeat counting still applies on later lines" {
+    parse 'Usage:
+  prog <a>
+  prog go <b> <b>'
+    [ "$(kind a)" = "value" ]
+    [ "$(kind b)" = "list" ]
+}

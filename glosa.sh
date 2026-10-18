@@ -34,16 +34,20 @@ _glosa_reset() {
     _glosa_o_default=()
     _glosa_o_var=()
     _glosa_o_n=0
+    _glosa_o_idx=" "
     _glosa_v_name=()
     _glosa_v_kind=()
     _glosa_v_elem=()
     _glosa_v_default=()
     _glosa_v_n=0
+    _glosa_v_idx=" "
     _glosa_k_type=()
     _glosa_k_kids=()
     _glosa_k_ref=()
     _glosa_k_n=0
     _glosa_roots=()
+    _glosa_opt_used=" "
+    _glosa_has_shortcut=0
     _glosa_t_kind=()
     _glosa_t_ref=()
     _glosa_t_val=()
@@ -75,15 +79,13 @@ _glosa_derive_name() {
 # Finds the variable <name>. Sets _glosa_found to its index (-1: none).
 # usage: _glosa_var_index <name>
 _glosa_var_index() {
-    local _glosa_i=0
-    _glosa_found=-1
-    while (( _glosa_i < _glosa_v_n )); do
-        if [[ "${_glosa_v_name[_glosa_i]}" == "$1" ]]; then
-            _glosa_found=$_glosa_i
-            return 0
-        fi
-        _glosa_i=$((_glosa_i + 1))
-    done
+    case "$_glosa_v_idx" in
+        *" $1="*)
+            _glosa_found="${_glosa_v_idx#* "$1"=}"
+            _glosa_found="${_glosa_found%% *}"
+            ;;
+        *) _glosa_found=-1 ;;
+    esac
 }
 
 # Finds or creates the variable <name> for the usage element <identity>
@@ -91,7 +93,13 @@ _glosa_var_index() {
 # returns 2 when another element already uses that name.
 # usage: _glosa_var <name> <kind> <identity>
 _glosa_var() {
-    _glosa_var_index "$1"
+    case "$_glosa_v_idx" in
+        *" $1="*)
+            _glosa_found="${_glosa_v_idx#* "$1"=}"
+            _glosa_found="${_glosa_found%% *}"
+            ;;
+        *) _glosa_found=-1 ;;
+    esac
     if (( _glosa_found >= 0 )); then
         if [[ "${_glosa_v_elem[_glosa_found]}" != "$3" ]]; then
             _glosa_fail 2 "name collision: '$1'"
@@ -103,6 +111,7 @@ _glosa_var() {
     _glosa_v_kind[_glosa_v_n]="$2"
     _glosa_v_elem[_glosa_v_n]="$3"
     _glosa_v_default[_glosa_v_n]=""
+    _glosa_v_idx+="$1=$_glosa_v_n "
     _glosa_found=$_glosa_v_n
     _glosa_v_n=$((_glosa_v_n + 1))
 }
@@ -111,22 +120,29 @@ _glosa_var() {
 # or long form. Sets _glosa_found to the option index.
 # usage: _glosa_add_option <short> <long> <argc> <default>
 _glosa_add_option() {
-    local _glosa_i=0 _glosa_v
-    while (( _glosa_i < _glosa_o_n )); do
-        if [[ ( -n "$1" && "${_glosa_o_short[_glosa_i]}" == "$1" ) || ( -n "$2" && "${_glosa_o_long[_glosa_i]}" == "$2" ) ]]; then
-            [[ -z "${_glosa_o_short[_glosa_i]}" ]] && _glosa_o_short[_glosa_i]="$1"
-            [[ -z "${_glosa_o_long[_glosa_i]}" ]] && _glosa_o_long[_glosa_i]="$2"
-            if (( $3 > _glosa_o_argc[_glosa_i] )); then
-                _glosa_o_argc[_glosa_i]=$3
-                _glosa_v_kind[_glosa_o_var[_glosa_i]]=value
-            fi
-            [[ -z "${_glosa_o_default[_glosa_i]}" ]] && _glosa_o_default[_glosa_i]="$4"
-            _glosa_v_default[_glosa_o_var[_glosa_i]]="${_glosa_o_default[_glosa_i]}"
-            _glosa_found=$_glosa_i
-            return 0
+    local _glosa_i=-1 _glosa_v
+    case "$_glosa_o_idx" in
+        *" ${1:-//}="*) _glosa_i="${_glosa_o_idx#* "$1"=}"; _glosa_i="${_glosa_i%% *}" ;;
+        *" ${2:-//}="*) _glosa_i="${_glosa_o_idx#* "$2"=}"; _glosa_i="${_glosa_i%% *}" ;;
+    esac
+    if (( _glosa_i >= 0 )); then
+        if [[ -z "${_glosa_o_short[_glosa_i]}" && -n "$1" ]]; then
+            _glosa_o_short[_glosa_i]="$1"
+            _glosa_o_idx+="$1=$_glosa_i "
         fi
-        _glosa_i=$((_glosa_i + 1))
-    done
+        if [[ -z "${_glosa_o_long[_glosa_i]}" && -n "$2" ]]; then
+            _glosa_o_long[_glosa_i]="$2"
+            _glosa_o_idx+="$2=$_glosa_i "
+        fi
+        if (( $3 > _glosa_o_argc[_glosa_i] )); then
+            _glosa_o_argc[_glosa_i]=$3
+            _glosa_v_kind[_glosa_o_var[_glosa_i]]=value
+        fi
+        [[ -z "${_glosa_o_default[_glosa_i]}" ]] && _glosa_o_default[_glosa_i]="$4"
+        _glosa_v_default[_glosa_o_var[_glosa_i]]="${_glosa_o_default[_glosa_i]}"
+        _glosa_found=$_glosa_i
+        return 0
+    fi
     _glosa_derive_name "${2:-$1}" || return
     if (( $3 )); then
         _glosa_var "$_glosa_name" value "opt:$_glosa_o_n" || return
@@ -140,6 +156,8 @@ _glosa_add_option() {
     _glosa_o_argc[_glosa_o_n]=$3
     _glosa_o_default[_glosa_o_n]="$4"
     _glosa_o_var[_glosa_o_n]=$_glosa_v
+    [[ -n "$1" ]] && _glosa_o_idx+="$1=$_glosa_o_n "
+    [[ -n "$2" ]] && _glosa_o_idx+="$2=$_glosa_o_n "
     _glosa_found=$_glosa_o_n
     _glosa_o_n=$((_glosa_o_n + 1))
 }
@@ -148,8 +166,8 @@ _glosa_add_option() {
 # usage: _glosa_parse_options
 _glosa_parse_options() {
     local _glosa_line _glosa_forms _glosa_desc _glosa_tok _glosa_short _glosa_long _glosa_argc _glosa_def
-    local _glosa_re='\[default: *([^]]*)\]' _glosa_nocase=0 _glosa_rc=0
-    shopt -q nocasematch && _glosa_nocase=1
+    local _glosa_re='\[[Dd][Ee][Ff][Aa][Uu][Ll][Tt]: *([^]]*)\]' _glosa_rc=0 _glosa_glob=0 IFS=$' \t\n'
+    case "$-" in *f*) _glosa_glob=1 ;; esac
     for _glosa_line in ${_glosa_option_lines[@]+"${_glosa_option_lines[@]}"}; do
         _glosa_forms="${_glosa_line%%  *}"
         _glosa_desc=""
@@ -160,21 +178,18 @@ _glosa_parse_options() {
         _glosa_long=""
         _glosa_argc=0
         _glosa_def=""
-        while [[ -n "$_glosa_forms" ]]; do
-            _glosa_forms="${_glosa_forms#"${_glosa_forms%%[! ]*}"}"
-            [[ -z "$_glosa_forms" ]] && break
-            _glosa_tok="${_glosa_forms%% *}"
-            _glosa_forms="${_glosa_forms#"$_glosa_tok"}"
+        set -f
+        # shellcheck disable=SC2086 # split the forms on spaces, globbing is off
+        for _glosa_tok in $_glosa_forms; do
             case "$_glosa_tok" in
                 --*) _glosa_long="$_glosa_tok" ;;
                 -*) _glosa_short="$_glosa_tok" ;;
                 *) _glosa_argc=1 ;;
             esac
         done
-        if (( _glosa_argc )); then
-            shopt -s nocasematch
-            [[ "$_glosa_desc" =~ $_glosa_re ]] && _glosa_def="${BASH_REMATCH[1]}"
-            (( _glosa_nocase )) || shopt -u nocasematch
+        (( _glosa_glob )) || set +f
+        if (( _glosa_argc )) && [[ "$_glosa_desc" =~ $_glosa_re ]]; then
+            _glosa_def="${BASH_REMATCH[1]}"
             _glosa_def="${_glosa_def%"${_glosa_def##*[! ]}"}"
         fi
         _glosa_add_option "$_glosa_short" "$_glosa_long" "$_glosa_argc" "$_glosa_def" || { _glosa_rc=$?; break; }
@@ -182,18 +197,23 @@ _glosa_parse_options() {
     return "$_glosa_rc"
 }
 
+# Finds an option by one of its exact forms ("-x" or "--name"). Sets
+# _glosa_found (-1: none).
+# usage: _glosa_find_exact <form>
+_glosa_find_exact() {
+    case "$_glosa_o_idx" in
+        *" $1="*)
+            _glosa_found="${_glosa_o_idx#* "$1"=}"
+            _glosa_found="${_glosa_found%% *}"
+            ;;
+        *) _glosa_found=-1 ;;
+    esac
+}
+
 # Finds an option by its short form ("-x"). Sets _glosa_found (-1: none).
 # usage: _glosa_find_short <-x>
 _glosa_find_short() {
-    local _glosa_i=0
-    _glosa_found=-1
-    while (( _glosa_i < _glosa_o_n )); do
-        if [[ "${_glosa_o_short[_glosa_i]}" == "$1" ]]; then
-            _glosa_found=$_glosa_i
-            return 0
-        fi
-        _glosa_i=$((_glosa_i + 1))
-    done
+    _glosa_find_exact "$1"
 }
 
 # Finds an option by its long form or a unique prefix of it. Sets
@@ -201,12 +221,9 @@ _glosa_find_short() {
 # usage: _glosa_find_long <--name>
 _glosa_find_long() {
     local _glosa_i=0 _glosa_hits=0
-    _glosa_found=-1
+    _glosa_find_exact "$1"
+    (( _glosa_found >= 0 )) && return 0
     while (( _glosa_i < _glosa_o_n )); do
-        if [[ "${_glosa_o_long[_glosa_i]}" == "$1" ]]; then
-            _glosa_found=$_glosa_i
-            return 0
-        fi
         if [[ -n "${_glosa_o_long[_glosa_i]}" && "${_glosa_o_long[_glosa_i]}" == "$1"* ]]; then
             _glosa_found=$_glosa_i
             _glosa_hits=$((_glosa_hits + 1))
@@ -274,6 +291,7 @@ _glosa_p_seq() {
                     return
                 fi
                 _glosa_last="${_glosa_nodes##* }"
+                _glosa_mark_repeated "$_glosa_last"
                 _glosa_node oneormore "$_glosa_last" ""
                 if [[ "$_glosa_nodes" == *" "* ]]; then
                     _glosa_nodes="${_glosa_nodes% *} $_glosa_new"
@@ -300,6 +318,7 @@ _glosa_p_atom() {
         "("|"[")
             if [[ "$_glosa_tok" == "[" && "${_glosa_tk[_glosa_tp]:-}" == options && "${_glosa_tk[_glosa_tp + 1]:-}" == "]" ]]; then
                 _glosa_tp=$((_glosa_tp + 2))
+                _glosa_has_shortcut=1
                 _glosa_node shortcut "" ""
                 _glosa_node optional "$_glosa_new" ""
                 _glosa_p_nodes=$_glosa_new
@@ -341,6 +360,8 @@ _glosa_p_atom() {
                 _glosa_add_option "" "$_glosa_tok" 1 "" || return
             fi
             _glosa_p_option_arg
+            _glosa_opt_used+="$_glosa_found "
+            _glosa_p_seen "${_glosa_o_var[_glosa_found]}"
             _glosa_node option "" "$_glosa_found"
             _glosa_p_nodes=$_glosa_new
             ;;
@@ -356,6 +377,8 @@ _glosa_p_atom() {
                     [[ -z "$_glosa_tok" ]] && _glosa_p_option_arg
                     _glosa_tok=""
                 fi
+                _glosa_opt_used+="$_glosa_found "
+                _glosa_p_seen "${_glosa_o_var[_glosa_found]}"
                 _glosa_node option "" "$_glosa_found"
                 _glosa_nodes+="${_glosa_nodes:+ }$_glosa_new"
             done
@@ -368,6 +391,7 @@ _glosa_p_atom() {
             fi
             _glosa_derive_name "$_glosa_tok" || return
             _glosa_var "$_glosa_name" value "arg:$_glosa_tok" || return
+            _glosa_p_seen "$_glosa_found"
             _glosa_node argument "" "$_glosa_found"
             _glosa_p_nodes=$_glosa_new
             ;;
@@ -381,10 +405,22 @@ _glosa_p_atom() {
     esac
 }
 
+# Records that the current usage line names variable <v>, flagging lines
+# that name the same variable twice.
+# usage: _glosa_p_seen <v>
+_glosa_p_seen() {
+    if [[ "$_glosa_line_seen" == *" $1 "* ]]; then
+        _glosa_line_dup=1
+    else
+        _glosa_line_seen+="$1 "
+    fi
+}
+
 # Adds a command node for <word>. Sets _glosa_p_nodes.
 _glosa_p_command() {
     _glosa_derive_name "$1" || return
     _glosa_var "$_glosa_name" flag "cmd:$1" || return
+    _glosa_p_seen "$_glosa_found"
     _glosa_node command "" "$_glosa_found"
     _glosa_p_nodes=$_glosa_new
 }
@@ -396,6 +432,27 @@ _glosa_p_option_arg() {
     if (( _glosa_o_argc[_glosa_found] )) && [[ "$_glosa_next" == "<"*">" || ( "$_glosa_next" == ["$_glosa_upper"]* && "$_glosa_next" != *[!"$_glosa_upper$_glosa_digit"_-]* ) ]]; then
         _glosa_tp=$((_glosa_tp + 1))
     fi
+}
+
+# Marks every element under node <n> as repeatable: flags and commands
+# become counters, values become lists.
+# usage: _glosa_mark_repeated <n>
+_glosa_mark_repeated() {
+    local _glosa_kid _glosa_v
+    case "${_glosa_k_type[$1]}" in
+        argument|command) _glosa_v=${_glosa_k_ref[$1]} ;;
+        option) _glosa_v=${_glosa_o_var[${_glosa_k_ref[$1]}]} ;;
+        *)
+            for _glosa_kid in ${_glosa_k_kids[$1]}; do
+                _glosa_mark_repeated "$_glosa_kid"
+            done
+            return 0
+            ;;
+    esac
+    case "${_glosa_v_kind[_glosa_v]}" in
+        flag) _glosa_v_kind[_glosa_v]=count ;;
+        value) _glosa_v_kind[_glosa_v]=list ;;
+    esac
 }
 
 # Counts how many times each variable can occur under node <n>; elements
@@ -446,7 +503,12 @@ _glosa_count() {
 _glosa_parse_patterns() {
     local _glosa_line _glosa_i _glosa_root _glosa_oldifs="$IFS" _glosa_glob=0 _glosa_bar="|"
     case "$-" in *f*) _glosa_glob=1 ;; esac
+    local _glosa_zeros=""
+    local -a _glosa_root_vars=()
+    _glosa_counted=""
     for _glosa_line in "${_glosa_usage_lines[@]}"; do
+        _glosa_line_seen=" "
+        _glosa_line_dup=0
         _glosa_line="${_glosa_line//(/ ( }"
         _glosa_line="${_glosa_line//)/ ) }"
         _glosa_line="${_glosa_line//[/ [ }"
@@ -468,24 +530,30 @@ _glosa_parse_patterns() {
         fi
         _glosa_node seq "$_glosa_p_nodes" ""
         _glosa_roots[${#_glosa_roots[@]}]=$_glosa_new
+        # "..." already marked its elements; only lines that name an element
+        # twice need the full count (alternatives take the maximum branch).
+        if (( _glosa_line_dup )); then
+            _glosa_counted+=" $_glosa_new"
+            _glosa_root_vars[_glosa_new]="$_glosa_line_seen"
+        fi
     done
-    for _glosa_root in "${_glosa_roots[@]}"; do
-        _glosa_cnt=()
-        _glosa_i=0
-        while (( _glosa_i < _glosa_v_n )); do
-            _glosa_cnt[_glosa_i]=0
-            _glosa_i=$((_glosa_i + 1))
-        done
+    [[ -z "$_glosa_counted" ]] && return 0
+    _glosa_i=0
+    while (( _glosa_i < _glosa_v_n )); do
+        _glosa_zeros+="0 "
+        _glosa_i=$((_glosa_i + 1))
+    done
+    for _glosa_root in $_glosa_counted; do
+        # shellcheck disable=SC2206 # a list of zeros
+        _glosa_cnt=($_glosa_zeros)
         _glosa_count "$_glosa_root" 0
-        _glosa_i=0
-        while (( _glosa_i < _glosa_v_n )); do
+        for _glosa_i in ${_glosa_root_vars[_glosa_root]}; do
             if (( _glosa_cnt[_glosa_i] > 1 )); then
                 case "${_glosa_v_kind[_glosa_i]}" in
                     flag) _glosa_v_kind[_glosa_i]=count ;;
                     value) _glosa_v_kind[_glosa_i]=list ;;
                 esac
             fi
-            _glosa_i=$((_glosa_i + 1))
         done
     done
     return 0
@@ -722,20 +790,14 @@ _glosa_match() {
     done
     _glosa_all+=" "
     # Options the [options] shortcut may consume: those no pattern names.
-    _glosa_shortcut_opts=""
-    _glosa_k=0
-    while (( _glosa_k < _glosa_o_n )); do
-        _glosa_shortcut_opts+=" $_glosa_k"
-        _glosa_k=$((_glosa_k + 1))
-    done
-    _glosa_k=0
-    while (( _glosa_k < _glosa_k_n )); do
-        if [[ "${_glosa_k_type[_glosa_k]}" == option ]]; then
-            _glosa_shortcut_opts=" $_glosa_shortcut_opts "
-            _glosa_shortcut_opts="${_glosa_shortcut_opts/ ${_glosa_k_ref[_glosa_k]} / }"
-        fi
-        _glosa_k=$((_glosa_k + 1))
-    done
+    _glosa_shortcut_opts=" "
+    if (( _glosa_has_shortcut )); then
+        _glosa_k=0
+        while (( _glosa_k < _glosa_o_n )); do
+            [[ "$_glosa_opt_used" == *" $_glosa_k "* ]] || _glosa_shortcut_opts+="$_glosa_k "
+            _glosa_k=$((_glosa_k + 1))
+        done
+    fi
     for _glosa_root in "${_glosa_roots[@]}"; do
         _glosa_left="$_glosa_all"
         _glosa_coll=""
@@ -786,45 +848,48 @@ _glosa_fail() {
 # Sets _glosa_usage_block, _glosa_usage_lines[] and _glosa_option_lines[].
 # usage: _glosa_sections <help>
 _glosa_sections() {
-    local _glosa_rest="$1" _glosa_line _glosa_trim _glosa_state=none _glosa_nocase=0
+    local _glosa_rest="$1"$'\n' _glosa_line _glosa_trim _glosa_state=none
     _glosa_usage_block=""
     _glosa_usage_lines=()
     _glosa_option_lines=()
-    shopt -q nocasematch && _glosa_nocase=1
-    shopt -s nocasematch
     while [[ -n "$_glosa_rest" ]]; do
         _glosa_line="${_glosa_rest%%$'\n'*}"
-        if [[ "$_glosa_line" == "$_glosa_rest" ]]; then
-            _glosa_rest=""
-        else
-            _glosa_rest="${_glosa_rest#*$'\n'}"
-        fi
+        _glosa_rest="${_glosa_rest#*$'\n'}"
         _glosa_line="${_glosa_line%$'\r'}"
+        # Sections continue while lines are indented (docopt rule).
+        if [[ "$_glosa_state" != none ]]; then
+            case "$_glosa_line" in
+                " "*|$'\t'*)
+                    _glosa_trim="${_glosa_line//$'\t'/  }"
+                    _glosa_trim="${_glosa_trim#"${_glosa_trim%%[! ]*}"}"
+                    if [[ "$_glosa_state" == usage ]]; then
+                        _glosa_usage_block+=$'\n'"$_glosa_line"
+                        _glosa_trim="${_glosa_trim%"${_glosa_trim##*[! ]}"}"
+                        [[ -n "$_glosa_trim" ]] && _glosa_usage_lines[${#_glosa_usage_lines[@]}]="$_glosa_trim"
+                    elif [[ "$_glosa_trim" == -* ]]; then
+                        _glosa_trim="${_glosa_trim%"${_glosa_trim##*[! ]}"}"
+                        _glosa_option_lines[${#_glosa_option_lines[@]}]="$_glosa_trim"
+                    fi
+                    continue
+                    ;;
+            esac
+            _glosa_state=none
+        fi
+        # Only lines with a colon can be section headers.
+        [[ "$_glosa_line" == *:* ]] || continue
         _glosa_trim="${_glosa_line//$'\t'/  }"
         _glosa_trim="${_glosa_trim#"${_glosa_trim%%[! ]*}"}"
         _glosa_trim="${_glosa_trim%"${_glosa_trim##*[! ]}"}"
-        # Sections continue while lines are indented (docopt rule).
-        if [[ "$_glosa_state" != none && ( "$_glosa_line" == " "* || "$_glosa_line" == $'\t'* ) ]]; then
-            if [[ "$_glosa_state" == usage ]]; then
-                _glosa_usage_block+=$'\n'"$_glosa_line"
-                [[ -n "$_glosa_trim" ]] && _glosa_usage_lines[${#_glosa_usage_lines[@]}]="$_glosa_trim"
-            elif [[ "$_glosa_trim" == -* ]]; then
-                _glosa_option_lines[${#_glosa_option_lines[@]}]="$_glosa_trim"
-            fi
-            continue
-        fi
-        _glosa_state=none
-        if [[ -z "$_glosa_usage_block" && "$_glosa_trim" == usage:* ]]; then
+        if [[ -z "$_glosa_usage_block" && "$_glosa_trim" == [Uu][Ss][Aa][Gg][Ee]:* ]]; then
             _glosa_state=usage
             _glosa_usage_block="$_glosa_line"
             _glosa_trim="${_glosa_trim:6}"
             _glosa_trim="${_glosa_trim#"${_glosa_trim%%[! ]*}"}"
             [[ -n "$_glosa_trim" ]] && _glosa_usage_lines[${#_glosa_usage_lines[@]}]="$_glosa_trim"
-        elif [[ "$_glosa_trim" == *options: ]]; then
+        elif [[ "$_glosa_trim" == *[Oo][Pp][Tt][Ii][Oo][Nn][Ss]: ]]; then
             _glosa_state=options
         fi
     done
-    (( _glosa_nocase )) || shopt -u nocasematch
     if [[ -z "$_glosa_usage_block" ]]; then
         _glosa_fail 2 "no usage section found"
         return
@@ -941,7 +1006,9 @@ _glosa_shell_leave() {
 # the help text itself is invalid.
 # usage: glosa::parse [--version <version>] <help> [args...]
 glosa::parse() {
-    local IFS=$' \t\n' _glosa_version="" _glosa_help _glosa_v=0
+    # The C locale makes string operations much faster in Bash 3.2; "local"
+    # restores the caller's locale on return.
+    local LC_ALL=C IFS=$' \t\n' _glosa_version="" _glosa_help _glosa_v=0
     if [[ "${1-}" == "--version" && $# -ge 2 ]]; then
         _glosa_version="$2"
         shift 2
@@ -953,8 +1020,19 @@ glosa::parse() {
     case "$_glosa_status" in
         ok)
             while (( _glosa_v < _glosa_v_n )); do
-                _glosa_code_for "$_glosa_v"
-                eval "$_glosa_code"
+                case "${_glosa_v_kind[_glosa_v]}" in
+                    flag|count)
+                        printf -v "${_glosa_v_name[_glosa_v]}" '%s' "${_glosa_r_val[_glosa_v]}"
+                        ;;
+                    value)
+                        _glosa_value_of "$_glosa_v"
+                        printf -v "${_glosa_v_name[_glosa_v]}" '%s' "$_glosa_value"
+                        ;;
+                    *)
+                        _glosa_code_for "$_glosa_v"
+                        eval "$_glosa_code"
+                        ;;
+                esac
                 _glosa_v=$((_glosa_v + 1))
             done
             _glosa_shell_leave
@@ -983,7 +1061,7 @@ glosa::parse() {
 # for help, version and errors.
 # usage: glosa [--version <version>] -h <help> : [args...]
 glosa::main() {
-    local IFS=$' \t\n' _glosa_version="" _glosa_help _glosa_v=0 _glosa_q
+    local LC_ALL=C IFS=$' \t\n' _glosa_version="" _glosa_help _glosa_v=0 _glosa_q
     if [[ "${1-}" == "--version" && $# -ge 2 ]]; then
         _glosa_version="$2"
         shift 2
