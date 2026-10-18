@@ -276,7 +276,8 @@ quiet=true" ]
 }
 
 @test "on exit paths the caller's EXIT trap sees the caller's shell state" {
-    run "$GLOSA_TEST_BASH" -c '
+    # LC_ALL is cleared first: CI runners export it.
+    run env -u LC_ALL "$GLOSA_TEST_BASH" -c '
         trap '"'"'echo "trap:$-:${LC_ALL-unset}"'"'"' EXIT
         source "$1"
         glosa::parse "Usage: p <x>"
