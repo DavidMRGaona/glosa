@@ -607,6 +607,166 @@ _glosa_tokenize() {
 }
 
 # ---------------------------------------------------------------------------
+# Matching
+# ---------------------------------------------------------------------------
+
+# Matches node <n> against the unconsumed tokens in _glosa_left (" i j k ")
+# and records "var:token" pairs in _glosa_coll. On failure both are restored.
+# Semantics follow docopt: optional and oneormore are greedy, either keeps the
+# branch that leaves the fewest tokens.
+# usage: _glosa_m <n>
+_glosa_m() {
+    local _glosa_sl="$_glosa_left" _glosa_sc="$_glosa_coll" _glosa_kid _glosa_k _glosa_v
+    local _glosa_bl _glosa_bc _glosa_min=-1 _glosa_len _glosa_times
+    case "${_glosa_k_type[$1]}" in
+        argument | command)
+            _glosa_v=${_glosa_k_ref[$1]}
+            for _glosa_k in $_glosa_left; do
+                [[ "${_glosa_t_kind[_glosa_k]}" == pos ]] || continue
+                if [[ "${_glosa_k_type[$1]}" == command && "${_glosa_t_val[_glosa_k]}" != "${_glosa_v_elem[_glosa_v]#cmd:}" ]]; then
+                    return 1
+                fi
+                _glosa_left="${_glosa_left/ $_glosa_k / }"
+                _glosa_coll+=" $_glosa_v:$_glosa_k"
+                return 0
+            done
+            return 1
+            ;;
+        option)
+            for _glosa_k in $_glosa_left; do
+                if [[ "${_glosa_t_kind[_glosa_k]}" == opt && "${_glosa_t_ref[_glosa_k]}" == "${_glosa_k_ref[$1]}" ]]; then
+                    _glosa_left="${_glosa_left/ $_glosa_k / }"
+                    _glosa_coll+=" ${_glosa_o_var[${_glosa_k_ref[$1]}]}:$_glosa_k"
+                    return 0
+                fi
+            done
+            return 1
+            ;;
+        seq)
+            for _glosa_kid in ${_glosa_k_kids[$1]}; do
+                if ! _glosa_m "$_glosa_kid"; then
+                    _glosa_left="$_glosa_sl"
+                    _glosa_coll="$_glosa_sc"
+                    return 1
+                fi
+            done
+            return 0
+            ;;
+        optional)
+            for _glosa_kid in ${_glosa_k_kids[$1]}; do
+                _glosa_m "$_glosa_kid" || :
+            done
+            return 0
+            ;;
+        either)
+            for _glosa_kid in ${_glosa_k_kids[$1]}; do
+                _glosa_left="$_glosa_sl"
+                _glosa_coll="$_glosa_sc"
+                if _glosa_m "$_glosa_kid"; then
+                    _glosa_len=${#_glosa_left}
+                    if (( _glosa_min < 0 || _glosa_len < _glosa_min )); then
+                        _glosa_min=$_glosa_len
+                        _glosa_bl="$_glosa_left"
+                        _glosa_bc="$_glosa_coll"
+                    fi
+                fi
+            done
+            if (( _glosa_min < 0 )); then
+                _glosa_left="$_glosa_sl"
+                _glosa_coll="$_glosa_sc"
+                return 1
+            fi
+            _glosa_left="$_glosa_bl"
+            _glosa_coll="$_glosa_bc"
+            return 0
+            ;;
+        oneormore)
+            _glosa_times=0
+            _glosa_kid="${_glosa_k_kids[$1]}"
+            while _glosa_m "$_glosa_kid"; do
+                _glosa_times=$((_glosa_times + 1))
+                [[ "$_glosa_left" == "$_glosa_bl" ]] && break
+                _glosa_bl="$_glosa_left"
+            done
+            (( _glosa_times > 0 ))
+            return
+            ;;
+        shortcut)
+            for _glosa_k in $_glosa_left; do
+                [[ "${_glosa_t_kind[_glosa_k]}" == opt ]] || continue
+                case " $_glosa_shortcut_opts " in
+                    *" ${_glosa_t_ref[_glosa_k]} "*)
+                        _glosa_left="${_glosa_left/ $_glosa_k / }"
+                        _glosa_coll+=" ${_glosa_o_var[${_glosa_t_ref[_glosa_k]}]}:$_glosa_k"
+                        ;;
+                esac
+            done
+            return 0
+            ;;
+        dashes)
+            return 0
+            ;;
+    esac
+    return 1
+}
+
+# Tries each usage line in order; the first one that consumes every token
+# wins. Fills _glosa_r_val[v]: true/false for flags, a number for counters,
+# a token index for values ("" when absent) and token indices for lists.
+# usage: _glosa_match
+_glosa_match() {
+    local _glosa_root _glosa_all="" _glosa_k=0 _glosa_pair _glosa_v _glosa_n
+    while (( _glosa_k < _glosa_t_n )); do
+        _glosa_all+=" $_glosa_k"
+        _glosa_k=$((_glosa_k + 1))
+    done
+    _glosa_all+=" "
+    # Options the [options] shortcut may consume: those no pattern names.
+    _glosa_shortcut_opts=""
+    _glosa_k=0
+    while (( _glosa_k < _glosa_o_n )); do
+        _glosa_shortcut_opts+=" $_glosa_k"
+        _glosa_k=$((_glosa_k + 1))
+    done
+    _glosa_k=0
+    while (( _glosa_k < _glosa_k_n )); do
+        if [[ "${_glosa_k_type[_glosa_k]}" == option ]]; then
+            _glosa_shortcut_opts=" $_glosa_shortcut_opts "
+            _glosa_shortcut_opts="${_glosa_shortcut_opts/ ${_glosa_k_ref[_glosa_k]} / }"
+        fi
+        _glosa_k=$((_glosa_k + 1))
+    done
+    for _glosa_root in "${_glosa_roots[@]}"; do
+        _glosa_left="$_glosa_all"
+        _glosa_coll=""
+        _glosa_m "$_glosa_root" || continue
+        [[ "$_glosa_left" == *[!\ ]* ]] && continue
+        _glosa_r_val=()
+        _glosa_v=0
+        while (( _glosa_v < _glosa_v_n )); do
+            case "${_glosa_v_kind[_glosa_v]}" in
+                flag) _glosa_r_val[_glosa_v]=false ;;
+                count) _glosa_r_val[_glosa_v]=0 ;;
+                *) _glosa_r_val[_glosa_v]="" ;;
+            esac
+            _glosa_v=$((_glosa_v + 1))
+        done
+        for _glosa_pair in $_glosa_coll; do
+            _glosa_v=${_glosa_pair%%:*}
+            _glosa_k=${_glosa_pair#*:}
+            case "${_glosa_v_kind[_glosa_v]}" in
+                flag) _glosa_r_val[_glosa_v]=true ;;
+                count) _glosa_n=${_glosa_r_val[_glosa_v]}; _glosa_r_val[_glosa_v]=$((_glosa_n + 1)) ;;
+                value) _glosa_r_val[_glosa_v]=$_glosa_k ;;
+                list) _glosa_r_val[_glosa_v]+="${_glosa_r_val[_glosa_v]:+ }$_glosa_k" ;;
+            esac
+        done
+        return 0
+    done
+    _glosa_fail 1 "Invalid arguments."
+}
+
+# ---------------------------------------------------------------------------
 # Errors
 # ---------------------------------------------------------------------------
 
