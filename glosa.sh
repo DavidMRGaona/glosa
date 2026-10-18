@@ -267,7 +267,7 @@ _glosa_p_seq() {
     while (( _glosa_tp < _glosa_tn )); do
         _glosa_tok="${_glosa_tk[_glosa_tp]}"
         case "$_glosa_tok" in
-            "|" | ")" | "]") break ;;
+            "|"|")"|"]") break ;;
             "...")
                 if [[ -z "$_glosa_nodes" ]]; then
                     _glosa_fail 2 "unexpected '...'"
@@ -297,7 +297,7 @@ _glosa_p_atom() {
     local _glosa_tok="${_glosa_tk[_glosa_tp]}" _glosa_inner _glosa_close _glosa_arg _glosa_nodes=""
     _glosa_tp=$((_glosa_tp + 1))
     case "$_glosa_tok" in
-        "(" | "[")
+        "("|"[")
             if [[ "$_glosa_tok" == "[" && "${_glosa_tk[_glosa_tp]:-}" == options && "${_glosa_tk[_glosa_tp + 1]:-}" == "]" ]]; then
                 _glosa_tp=$((_glosa_tp + 2))
                 _glosa_node shortcut "" ""
@@ -361,7 +361,7 @@ _glosa_p_atom() {
             done
             _glosa_p_nodes="$_glosa_nodes"
             ;;
-        "<"*">" | ["$_glosa_upper"]*)
+        "<"*">"|["$_glosa_upper"]*)
             if [[ "$_glosa_tok" == ["$_glosa_upper"]* && "$_glosa_tok" == *[!"$_glosa_upper$_glosa_digit"_-]* ]]; then
                 _glosa_p_command "$_glosa_tok"
                 return
@@ -371,7 +371,7 @@ _glosa_p_atom() {
             _glosa_node argument "" "$_glosa_found"
             _glosa_p_nodes=$_glosa_new
             ;;
-        ")" | "]")
+        ")"|"]")
             _glosa_fail 2 "unexpected '$_glosa_tok'"
             return
             ;;
@@ -405,7 +405,7 @@ _glosa_count() {
     local _glosa_t="${_glosa_k_type[$1]}" _glosa_kid _glosa_rep="$2" _glosa_v _glosa_i
     local -a _glosa_before _glosa_best
     case "$_glosa_t" in
-        argument | command)
+        argument|command)
             _glosa_v=${_glosa_k_ref[$1]}
             _glosa_cnt[_glosa_v]=$(( _glosa_cnt[_glosa_v] + 1 + _glosa_rep ))
             ;;
@@ -444,14 +444,14 @@ _glosa_count() {
 # repeatable variables as count (flags, commands) or list (values).
 # usage: _glosa_parse_patterns
 _glosa_parse_patterns() {
-    local _glosa_line _glosa_i _glosa_root _glosa_oldifs="$IFS" _glosa_glob=0
+    local _glosa_line _glosa_i _glosa_root _glosa_oldifs="$IFS" _glosa_glob=0 _glosa_bar="|"
     case "$-" in *f*) _glosa_glob=1 ;; esac
     for _glosa_line in "${_glosa_usage_lines[@]}"; do
         _glosa_line="${_glosa_line//(/ ( }"
         _glosa_line="${_glosa_line//)/ ) }"
         _glosa_line="${_glosa_line//[/ [ }"
         _glosa_line="${_glosa_line//]/ ] }"
-        _glosa_line="${_glosa_line//|/ | }"
+        _glosa_line="${_glosa_line//"$_glosa_bar"/ $_glosa_bar }"
         _glosa_line="${_glosa_line//.../ ... }"
         set -f
         IFS=' '
@@ -496,7 +496,7 @@ _glosa_parse_patterns() {
 _glosa_tree_dump() {
     local _glosa_t="${_glosa_k_type[$1]}" _glosa_out _glosa_kid
     case "$_glosa_t" in
-        argument | command) _glosa_out="($_glosa_t ${_glosa_v_name[${_glosa_k_ref[$1]}]})" ;;
+        argument|command) _glosa_out="($_glosa_t ${_glosa_v_name[${_glosa_k_ref[$1]}]})" ;;
         option) _glosa_out="(option ${_glosa_v_name[${_glosa_o_var[${_glosa_k_ref[$1]}]}]})" ;;
         *)
             _glosa_out="($_glosa_t"
@@ -619,7 +619,7 @@ _glosa_m() {
     local _glosa_sl="$_glosa_left" _glosa_sc="$_glosa_coll" _glosa_kid _glosa_k _glosa_v
     local _glosa_bl _glosa_bc _glosa_min=-1 _glosa_len _glosa_times
     case "${_glosa_k_type[$1]}" in
-        argument | command)
+        argument|command)
             _glosa_v=${_glosa_k_ref[$1]}
             for _glosa_k in $_glosa_left; do
                 [[ "${_glosa_t_kind[_glosa_k]}" == pos ]] || continue
@@ -836,19 +836,192 @@ _glosa_sections() {
     return 0
 }
 
-# Parses "$@" against the usage described in <help> and assigns one global
-# variable per declared element.
-# usage: glosa::parse [--version <version>] <help> [args...]
-glosa::parse() {
-    printf 'glosa: not implemented\n' >&2
-    return 2
+# ---------------------------------------------------------------------------
+# Running a parse
+# ---------------------------------------------------------------------------
+
+# Runs every phase. Sets _glosa_status to ok, help, version, 1 (usage error)
+# or 2 (invalid help text).
+# usage: _glosa_run <version> <help> [args...]
+_glosa_run() {
+    local _glosa_ver="$1" _glosa_text="$2"
+    shift 2
+    _glosa_reset
+    if ! { _glosa_sections "$_glosa_text" && _glosa_parse_options && _glosa_parse_patterns; }; then
+        _glosa_status=2
+        return
+    fi
+    if [[ "${1-}" == "-h" || "${1-}" == "--help" ]]; then
+        _glosa_status=help
+    elif [[ -n "$_glosa_ver" && "${1-}" == "--version" ]]; then
+        _glosa_status=version
+    elif _glosa_tokenize "$@" && _glosa_match; then
+        _glosa_status=ok
+    else
+        _glosa_status=1
+    fi
 }
 
-# Command-line entry point: prints shell code for eval.
+# Computes the final value of variable <v>: _glosa_value for scalars,
+# _glosa_items[] for lists.
+# usage: _glosa_value_of <v>
+_glosa_value_of() {
+    local _glosa_k _glosa_def _glosa_oldifs="$IFS"
+    _glosa_value="${_glosa_r_val[$1]}"
+    _glosa_items=()
+    case "${_glosa_v_kind[$1]}" in
+        value)
+            if [[ -n "$_glosa_value" ]]; then
+                _glosa_value="${_glosa_t_val[_glosa_value]}"
+            else
+                _glosa_value="${_glosa_v_default[$1]}"
+            fi
+            ;;
+        list)
+            for _glosa_k in $_glosa_value; do
+                _glosa_items[${#_glosa_items[@]}]="${_glosa_t_val[_glosa_k]}"
+            done
+            _glosa_def="${_glosa_v_default[$1]}"
+            if (( ${#_glosa_items[@]} == 0 )) && [[ -n "$_glosa_def" ]]; then
+                IFS=' '
+                # shellcheck disable=SC2206 # split the default on spaces, globbing is off
+                _glosa_items=($_glosa_def)
+                IFS="$_glosa_oldifs"
+            fi
+            ;;
+    esac
+}
+
+# Builds "name=value" or "name=(items)" shell code for variable <v> into
+# _glosa_code, with every value quoted by printf %q.
+# usage: _glosa_code_for <v>
+_glosa_code_for() {
+    local _glosa_item _glosa_q
+    _glosa_value_of "$1"
+    if [[ "${_glosa_v_kind[$1]}" == list ]]; then
+        _glosa_code="${_glosa_v_name[$1]}=("
+        for _glosa_item in ${_glosa_items[@]+"${_glosa_items[@]}"}; do
+            printf -v _glosa_q '%q' "$_glosa_item"
+            _glosa_code+=" $_glosa_q"
+        done
+        _glosa_code+=" )"
+    else
+        printf -v _glosa_q '%q' "$_glosa_value"
+        _glosa_code="${_glosa_v_name[$1]}=$_glosa_q"
+    fi
+}
+
+# Saves the caller's shell options and switches to the ones glosa needs.
+_glosa_shell_enter() {
+    _glosa_saved_opts="$-"
+    _glosa_saved_nocase=0
+    shopt -q nocasematch && _glosa_saved_nocase=1
+    set +eu
+    set -f
+    shopt -u nocasematch
+}
+
+# Restores the options saved by _glosa_shell_enter.
+_glosa_shell_leave() {
+    [[ "$_glosa_saved_opts" == *f* ]] || set +f
+    [[ "$_glosa_saved_opts" == *u* ]] && set -u
+    [[ "$_glosa_saved_opts" == *e* ]] && set -e
+    (( _glosa_saved_nocase )) && shopt -s nocasematch
+    return 0
+}
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+# Parses "$@" against the usage described in <help> and assigns one global
+# variable per declared element. Prints the help and exits 0 when the first
+# argument is -h or --help (or --version, when a version is given); prints
+# a usage error and exits 1 when the arguments do not match; exits 2 when
+# the help text itself is invalid.
+# usage: glosa::parse [--version <version>] <help> [args...]
+glosa::parse() {
+    local IFS=$' \t\n' _glosa_version="" _glosa_help _glosa_v=0
+    if [[ "${1-}" == "--version" && $# -ge 2 ]]; then
+        _glosa_version="$2"
+        shift 2
+    fi
+    _glosa_help="${1-}"
+    (( $# )) && shift
+    _glosa_shell_enter
+    _glosa_run "$_glosa_version" "$_glosa_help" "$@"
+    case "$_glosa_status" in
+        ok)
+            while (( _glosa_v < _glosa_v_n )); do
+                _glosa_code_for "$_glosa_v"
+                eval "$_glosa_code"
+                _glosa_v=$((_glosa_v + 1))
+            done
+            _glosa_shell_leave
+            return 0
+            ;;
+        help)
+            printf '%s\n' "$_glosa_help"
+            exit 0
+            ;;
+        version)
+            printf '%s\n' "$_glosa_version"
+            exit 0
+            ;;
+        1)
+            printf '%s\n\n%s\n' "$_glosa_err_msg" "$_glosa_usage_block" >&2
+            exit 1
+            ;;
+        *)
+            printf 'glosa: invalid help text: %s\n' "$_glosa_err_msg" >&2
+            exit 2
+            ;;
+    esac
+}
+
+# Command-line entry point: prints shell code for eval, ending in "exit N"
+# for help, version and errors.
 # usage: glosa [--version <version>] -h <help> : [args...]
 glosa::main() {
-    printf 'usage: glosa [--version <version>] -h <help> : [args...]\n' >&2
-    return 2
+    local IFS=$' \t\n' _glosa_version="" _glosa_help _glosa_v=0 _glosa_q
+    if [[ "${1-}" == "--version" && $# -ge 2 ]]; then
+        _glosa_version="$2"
+        shift 2
+    fi
+    if [[ "${1-}" != "-h" || $# -lt 3 || "$3" != ":" ]]; then
+        printf 'usage: glosa [--version <version>] -h <help> : [args...]\n' >&2
+        return 2
+    fi
+    _glosa_help="$2"
+    shift 3
+    _glosa_shell_enter
+    _glosa_run "$_glosa_version" "$_glosa_help" "$@"
+    case "$_glosa_status" in
+        ok)
+            while (( _glosa_v < _glosa_v_n )); do
+                _glosa_code_for "$_glosa_v"
+                printf '%s\n' "$_glosa_code"
+                _glosa_v=$((_glosa_v + 1))
+            done
+            return 0
+            ;;
+        help|version)
+            [[ "$_glosa_status" == version ]] && _glosa_help="$_glosa_version"
+            printf -v _glosa_q '%q' "$_glosa_help"
+            printf "printf '%%s\\\\n' %s\nexit 0\n" "$_glosa_q"
+            return 0
+            ;;
+        1)
+            printf '%s\n\n%s\n' "$_glosa_err_msg" "$_glosa_usage_block" >&2
+            printf 'exit 1\n'
+            return 1
+            ;;
+        *)
+            printf 'glosa: invalid help text: %s\n' "$_glosa_err_msg" >&2
+            printf 'exit 2\n'
+            return 2
+            ;;
+    esac
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
