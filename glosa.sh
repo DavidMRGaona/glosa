@@ -44,6 +44,10 @@ _glosa_reset() {
     _glosa_k_ref=()
     _glosa_k_n=0
     _glosa_roots=()
+    _glosa_t_kind=()
+    _glosa_t_ref=()
+    _glosa_t_val=()
+    _glosa_t_n=0
 }
 
 # ---------------------------------------------------------------------------
@@ -504,6 +508,102 @@ _glosa_tree_dump() {
             ;;
     esac
     _glosa_dump="$_glosa_out"
+}
+
+# ---------------------------------------------------------------------------
+# Command-line arguments
+# ---------------------------------------------------------------------------
+
+# Appends a token.
+# usage: _glosa_token <pos|opt> <option index or ""> <value>
+_glosa_token() {
+    _glosa_t_kind[_glosa_t_n]="$1"
+    _glosa_t_ref[_glosa_t_n]="$2"
+    _glosa_t_val[_glosa_t_n]="$3"
+    _glosa_t_n=$((_glosa_t_n + 1))
+}
+
+# Splits the arguments into option and positional tokens. Returns 1 with a
+# usage error message for unknown or malformed options.
+# usage: _glosa_tokenize [args...]
+_glosa_tokenize() {
+    local _glosa_a _glosa_name _glosa_val _glosa_has _glosa_chars
+    _glosa_t_kind=()
+    _glosa_t_ref=()
+    _glosa_t_val=()
+    _glosa_t_n=0
+    while (( $# )); do
+        _glosa_a="$1"
+        shift
+        if [[ "$_glosa_a" == "--" ]]; then
+            while (( $# )); do
+                _glosa_token pos "" "$1"
+                shift
+            done
+            break
+        fi
+        case "$_glosa_a" in
+            --*)
+                _glosa_name="${_glosa_a%%=*}"
+                _glosa_has=0
+                _glosa_val=""
+                if [[ "$_glosa_a" == *=* ]]; then
+                    _glosa_has=1
+                    _glosa_val="${_glosa_a#*=}"
+                fi
+                _glosa_find_long "$_glosa_name" || return
+                if (( _glosa_found < 0 )); then
+                    _glosa_fail 1 "Unknown option: '$_glosa_name'"
+                    return
+                fi
+                _glosa_name="${_glosa_o_long[_glosa_found]}"
+                if (( _glosa_o_argc[_glosa_found] )); then
+                    if (( ! _glosa_has )); then
+                        if (( ! $# )); then
+                            _glosa_fail 1 "Option '$_glosa_name' requires an argument"
+                            return
+                        fi
+                        _glosa_val="$1"
+                        shift
+                    fi
+                elif (( _glosa_has )); then
+                    _glosa_fail 1 "Option '$_glosa_name' does not take an argument"
+                    return
+                fi
+                _glosa_token opt "$_glosa_found" "$_glosa_val"
+                ;;
+            -?*)
+                _glosa_chars="${_glosa_a#-}"
+                while [[ -n "$_glosa_chars" ]]; do
+                    _glosa_name="-${_glosa_chars:0:1}"
+                    _glosa_chars="${_glosa_chars:1}"
+                    _glosa_find_short "$_glosa_name"
+                    if (( _glosa_found < 0 )); then
+                        _glosa_fail 1 "Unknown option: '$_glosa_name'"
+                        return
+                    fi
+                    _glosa_val=""
+                    if (( _glosa_o_argc[_glosa_found] )); then
+                        if [[ -n "$_glosa_chars" ]]; then
+                            _glosa_val="$_glosa_chars"
+                            _glosa_chars=""
+                        elif (( $# )); then
+                            _glosa_val="$1"
+                            shift
+                        else
+                            _glosa_fail 1 "Option '$_glosa_name' requires an argument"
+                            return
+                        fi
+                    fi
+                    _glosa_token opt "$_glosa_found" "$_glosa_val"
+                done
+                ;;
+            *)
+                _glosa_token pos "" "$_glosa_a"
+                ;;
+        esac
+    done
+    return 0
 }
 
 # ---------------------------------------------------------------------------
