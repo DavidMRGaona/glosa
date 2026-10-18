@@ -105,3 +105,9 @@ describe() {
     _glosa_derive_name "-t"; [ "$_glosa_name" = "_t" ]
     _glosa_derive_name "--skip-setup"; [ "$_glosa_name" = "skip_setup" ]
 }
+
+@test "non-ASCII names are rejected in any locale" {
+    _glosa_derive_name "<café>" || true
+    [ "$_glosa_err_code" -eq 2 ]
+    [ "$_glosa_err_msg" = "invalid variable name 'café'" ]
+}
