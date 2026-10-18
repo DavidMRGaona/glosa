@@ -111,3 +111,17 @@ describe() {
     [ "$_glosa_err_code" -eq 2 ]
     [ "$_glosa_err_msg" = "invalid variable name 'café'" ]
 }
+
+@test "names bash treats specially are rejected" {
+    local n
+    for n in PATH IFS HOME LC_ALL UID BASH_ENV PS1 SECONDS; do
+        _glosa_err_code=0
+        _glosa_derive_name "$n" || true
+        [ "$_glosa_err_code" -eq 2 ]
+        [ "$_glosa_err_msg" = "reserved variable name '$n'" ]
+    done
+    _glosa_derive_name "-" || true
+    [ "$_glosa_err_msg" = "reserved variable name '_'" ]
+    _glosa_derive_name "USER"
+    [ "$_glosa_name" = "USER" ]
+}

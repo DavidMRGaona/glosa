@@ -59,6 +59,7 @@ small=false
 help=false" ]
 }
 
+# shellcheck disable=SC2088 # literal tildes on purpose
 @test "values round-trip without injection" {
     local pwned="$BATS_TEST_TMPDIR/pwned" v expected
     local -a values=(
@@ -72,6 +73,11 @@ help=false" ]
         '\back\slash'
         '*'
         ' leading and trailing '
+        '~'
+        '~/x'
+        'a:~'
+        'a=~'
+        $'ctl\001\177'
     )
     for v in "${values[@]}"; do
         GLOSA_DUMP="text"
@@ -234,4 +240,49 @@ tag[1]=b" ]
     [ "$status" -eq 0 ]
     [ "${lines[0]}" = "1|en_US.UTF-8|año ñu" ]
     [ "${lines[1]}" = "café" ]
+}
+
+@test "help text with a tilde is printed literally" {
+    local help='Usage: prog <x>
+
+Reads ~/.config and a:~/x'
+    GLOSA_DUMP=""
+    glosa_both "$help" -h
+    [ "$(< "$BATS_TEST_TMPDIR/out.cli")" = "$help" ]
+    [ "$(< "$BATS_TEST_TMPDIR/out.src")" = "$help" ]
+}
+
+@test "default on a continuation line of an option description" {
+    GLOSA_DUMP="output"
+    glosa_both 'Usage: p [options]
+
+Options:
+  -o FILE, --output FILE  Output file
+                          [default: out.txt]'
+    [ "$output" = "exit=0
+output=out.txt" ]
+}
+
+@test "a fully indented help with whitespace-only blank lines" {
+    GLOSA_DUMP="x quiet"
+    glosa_both "    Usage:
+      p <x> [--quiet]
+    
+    Options:
+      -q --quiet  Quiet" a -q
+    [ "$output" = "exit=0
+x=a
+quiet=true" ]
+}
+
+@test "on exit paths the caller's EXIT trap sees the caller's shell state" {
+    run "$GLOSA_TEST_BASH" -c '
+        trap '"'"'echo "trap:$-:${LC_ALL-unset}"'"'"' EXIT
+        source "$1"
+        glosa::parse "Usage: p <x>"
+    ' _ "$GLOSA"
+    [ "$status" -eq 1 ]
+    [[ "${lines[${#lines[@]}-1]}" == trap:* ]]
+    [[ "${lines[${#lines[@]}-1]}" != trap:*f*:* ]]
+    [[ "${lines[${#lines[@]}-1]}" == *:unset ]]
 }

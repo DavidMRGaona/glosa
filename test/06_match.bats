@@ -207,3 +207,20 @@ Options:
     [ "$first" = arg0 ]
     [ "$last" = arg499 ]
 }
+
+@test "thousands of variadic arguments stay fast" {
+    # shellcheck disable=SC2016 # the script is expanded by the inner shell
+    run "$GLOSA_TEST_BASH" -c '
+        source "$1"
+        many=(); i=0
+        while (( i < 5000 )); do many[i]="x$i"; i=$((i + 1)); done
+        start=$SECONDS
+        glosa::parse "Usage: p [-v] <args>..." "${many[@]}"
+        echo "$((SECONDS - start)) ${#args[@]} ${args[4999]}"
+    ' _ "$GLOSA"
+    [ "$status" -eq 0 ]
+    read -r elapsed count last <<< "$output"
+    (( elapsed <= 2 ))
+    [ "$count" -eq 5000 ]
+    [ "$last" = x4999 ]
+}

@@ -73,6 +73,16 @@ _glosa_derive_name() {
         _glosa_fail 2 "invalid variable name '$_glosa_n'"
         return
     fi
+    case "$_glosa_n" in
+        _|IFS|PATH|HOME|PWD|OLDPWD|CDPATH|SHELLOPTS|BASHOPTS|BASH|BASH_*|BASHPID|\
+        UID|EUID|PPID|GROUPS|RANDOM|SRANDOM|SECONDS|LINENO|OPTIND|OPTARG|OPTERR|\
+        FUNCNAME|PIPESTATUS|DIRSTACK|EPOCHREALTIME|EPOCHSECONDS|LANG|LC_*|TMOUT|\
+        PS1|PS2|PS3|PS4|PROMPT_COMMAND|GLOBIGNORE|POSIXLY_CORRECT|COMP_*)
+            # Assigning these would break the shell or be silently lost.
+            _glosa_fail 2 "reserved variable name '$_glosa_n'"
+            return
+            ;;
+    esac
     _glosa_name="$_glosa_n"
 }
 
@@ -582,63 +592,66 @@ _glosa_tree_dump() {
 # Command-line arguments
 # ---------------------------------------------------------------------------
 
-# Appends a token.
-# usage: _glosa_token <pos|opt> <option index or ""> <value>
-_glosa_token() {
-    _glosa_t_kind[_glosa_t_n]="$1"
-    _glosa_t_ref[_glosa_t_n]="$2"
-    _glosa_t_val[_glosa_t_n]="$3"
-    _glosa_t_n=$((_glosa_t_n + 1))
-}
-
 # Splits the arguments into option and positional tokens. Returns 1 with a
 # usage error message for unknown or malformed options.
 # usage: _glosa_tokenize [args...]
 _glosa_tokenize() {
-    local _glosa_a _glosa_name _glosa_val _glosa_has _glosa_chars
+    # A single "for" pass with no function calls per argument: in Bash 3.2,
+    # "shift" and every call made from a frame with thousands of positional
+    # parameters cost O(n), which would make the loop quadratic.
+    local _glosa_a _glosa_name _glosa_val _glosa_chars _glosa_dd=0
+    local _glosa_need=-1 _glosa_need_name=""
     _glosa_t_kind=()
     _glosa_t_ref=()
     _glosa_t_val=()
     _glosa_t_n=0
-    while (( $# )); do
-        _glosa_a="$1"
-        shift
-        if [[ "$_glosa_a" == "--" ]]; then
-            while (( $# )); do
-                _glosa_token pos "" "$1"
-                shift
-            done
-            break
+    for _glosa_a in "$@"; do
+        if (( _glosa_need >= 0 )); then
+            # The value of the previous option.
+            _glosa_t_kind[_glosa_t_n]=opt
+            _glosa_t_ref[_glosa_t_n]="$_glosa_need"
+            _glosa_t_val[_glosa_t_n]="$_glosa_a"
+            _glosa_t_n=$((_glosa_t_n + 1))
+            _glosa_need=-1
+            continue
+        fi
+        if (( _glosa_dd )); then
+            _glosa_t_kind[_glosa_t_n]=pos
+            _glosa_t_ref[_glosa_t_n]=""
+            _glosa_t_val[_glosa_t_n]="$_glosa_a"
+            _glosa_t_n=$((_glosa_t_n + 1))
+            continue
         fi
         case "$_glosa_a" in
+            --)
+                _glosa_dd=1
+                ;;
             --*)
                 _glosa_name="${_glosa_a%%=*}"
-                _glosa_has=0
-                _glosa_val=""
-                if [[ "$_glosa_a" == *=* ]]; then
-                    _glosa_has=1
-                    _glosa_val="${_glosa_a#*=}"
-                fi
                 _glosa_find_long "$_glosa_name" || return
                 if (( _glosa_found < 0 )); then
                     _glosa_fail 1 "Unknown option: '$_glosa_name'"
                     return
                 fi
                 _glosa_name="${_glosa_o_long[_glosa_found]}"
-                if (( _glosa_o_argc[_glosa_found] )); then
-                    if (( ! _glosa_has )); then
-                        if (( ! $# )); then
-                            _glosa_fail 1 "Option '$_glosa_name' requires an argument"
-                            return
-                        fi
-                        _glosa_val="$1"
-                        shift
+                if [[ "$_glosa_a" == *=* ]]; then
+                    if (( ! _glosa_o_argc[_glosa_found] )); then
+                        _glosa_fail 1 "Option '$_glosa_name' does not take an argument"
+                        return
                     fi
-                elif (( _glosa_has )); then
-                    _glosa_fail 1 "Option '$_glosa_name' does not take an argument"
-                    return
+                    _glosa_t_kind[_glosa_t_n]=opt
+                    _glosa_t_ref[_glosa_t_n]="$_glosa_found"
+                    _glosa_t_val[_glosa_t_n]="${_glosa_a#*=}"
+                    _glosa_t_n=$((_glosa_t_n + 1))
+                elif (( _glosa_o_argc[_glosa_found] )); then
+                    _glosa_need=$_glosa_found
+                    _glosa_need_name="$_glosa_name"
+                else
+                    _glosa_t_kind[_glosa_t_n]=opt
+                    _glosa_t_ref[_glosa_t_n]="$_glosa_found"
+                    _glosa_t_val[_glosa_t_n]=""
+                    _glosa_t_n=$((_glosa_t_n + 1))
                 fi
-                _glosa_token opt "$_glosa_found" "$_glosa_val"
                 ;;
             -?*)
                 _glosa_chars="${_glosa_a#-}"
@@ -652,25 +665,32 @@ _glosa_tokenize() {
                     fi
                     _glosa_val=""
                     if (( _glosa_o_argc[_glosa_found] )); then
-                        if [[ -n "$_glosa_chars" ]]; then
-                            _glosa_val="$_glosa_chars"
-                            _glosa_chars=""
-                        elif (( $# )); then
-                            _glosa_val="$1"
-                            shift
-                        else
-                            _glosa_fail 1 "Option '$_glosa_name' requires an argument"
-                            return
+                        if [[ -z "$_glosa_chars" ]]; then
+                            _glosa_need=$_glosa_found
+                            _glosa_need_name="$_glosa_name"
+                            break
                         fi
+                        _glosa_val="$_glosa_chars"
+                        _glosa_chars=""
                     fi
-                    _glosa_token opt "$_glosa_found" "$_glosa_val"
+                    _glosa_t_kind[_glosa_t_n]=opt
+                    _glosa_t_ref[_glosa_t_n]="$_glosa_found"
+                    _glosa_t_val[_glosa_t_n]="$_glosa_val"
+                    _glosa_t_n=$((_glosa_t_n + 1))
                 done
                 ;;
             *)
-                _glosa_token pos "" "$_glosa_a"
+                _glosa_t_kind[_glosa_t_n]=pos
+                _glosa_t_ref[_glosa_t_n]=""
+                _glosa_t_val[_glosa_t_n]="$_glosa_a"
+                _glosa_t_n=$((_glosa_t_n + 1))
                 ;;
         esac
     done
+    if (( _glosa_need >= 0 )); then
+        _glosa_fail 1 "Option '$_glosa_need_name' requires an argument"
+        return
+    fi
     return 0
 }
 
@@ -684,11 +704,29 @@ _glosa_tokenize() {
 # branch that leaves the fewest tokens.
 # usage: _glosa_m <n>
 _glosa_m() {
-    local _glosa_sl="$_glosa_left" _glosa_sc="$_glosa_coll" _glosa_kid _glosa_k _glosa_v
-    local _glosa_bl _glosa_bc _glosa_min=-1 _glosa_len _glosa_times
+    local _glosa_kid _glosa_k _glosa_v _glosa_sl _glosa_sc
+    local _glosa_bl _glosa_bc _glosa_min=-1 _glosa_len=-1 _glosa_times=0 _glosa_keep _glosa_got
+    # Leaves never change state when they fail; only groups save it.
+    case "${_glosa_k_type[$1]}" in
+        seq|either)
+            _glosa_sl="$_glosa_left"
+            _glosa_sc="$_glosa_coll"
+            ;;
+    esac
     case "${_glosa_k_type[$1]}" in
         argument|command)
             _glosa_v=${_glosa_k_ref[$1]}
+            # Fast path: the first unconsumed token is usually a positional.
+            _glosa_k="${_glosa_left# }"
+            _glosa_k="${_glosa_k%% *}"
+            if [[ -n "$_glosa_k" && "${_glosa_t_kind[_glosa_k]}" == pos ]]; then
+                if [[ "${_glosa_k_type[$1]}" == command && "${_glosa_t_val[_glosa_k]}" != "${_glosa_v_elem[_glosa_v]#cmd:}" ]]; then
+                    return 1
+                fi
+                _glosa_left="${_glosa_left#" $_glosa_k"}"
+                _glosa_coll+=" $_glosa_v:$_glosa_k"
+                return 0
+            fi
             for _glosa_k in $_glosa_left; do
                 [[ "${_glosa_t_kind[_glosa_k]}" == pos ]] || continue
                 if [[ "${_glosa_k_type[$1]}" == command && "${_glosa_t_val[_glosa_k]}" != "${_glosa_v_elem[_glosa_v]#cmd:}" ]]; then
@@ -749,12 +787,29 @@ _glosa_m() {
             return 0
             ;;
         oneormore)
-            _glosa_times=0
             _glosa_kid="${_glosa_k_kids[$1]}"
+            if [[ "${_glosa_k_type[_glosa_kid]}" == argument ]]; then
+                # "<x>..." in one pass: take every positional in order and
+                # keep the options, as repeated matching would.
+                _glosa_v=${_glosa_k_ref[_glosa_kid]}
+                _glosa_keep=" "
+                _glosa_got=""
+                for _glosa_k in $_glosa_left; do
+                    if [[ "${_glosa_t_kind[_glosa_k]}" == pos ]]; then
+                        _glosa_got+=" $_glosa_v:$_glosa_k"
+                    else
+                        _glosa_keep+="$_glosa_k "
+                    fi
+                done
+                [[ -n "$_glosa_got" ]] || return 1
+                _glosa_left="$_glosa_keep"
+                _glosa_coll+="$_glosa_got"
+                return 0
+            fi
             while _glosa_m "$_glosa_kid"; do
                 _glosa_times=$((_glosa_times + 1))
-                [[ "$_glosa_left" == "$_glosa_bl" ]] && break
-                _glosa_bl="$_glosa_left"
+                (( ${#_glosa_left} == _glosa_len )) && break
+                _glosa_len=${#_glosa_left}
             done
             (( _glosa_times > 0 ))
             return
@@ -862,13 +917,23 @@ _glosa_sections() {
                 " "*|$'\t'*)
                     _glosa_trim="${_glosa_line//$'\t'/  }"
                     _glosa_trim="${_glosa_trim#"${_glosa_trim%%[! ]*}"}"
+                    if [[ -z "$_glosa_trim" ]]; then
+                        # A whitespace-only line is a blank line.
+                        _glosa_state=none
+                        continue
+                    fi
                     if [[ "$_glosa_state" == usage ]]; then
                         _glosa_usage_block+=$'\n'"$_glosa_line"
                         _glosa_trim="${_glosa_trim%"${_glosa_trim##*[! ]}"}"
                         [[ -n "$_glosa_trim" ]] && _glosa_usage_lines[${#_glosa_usage_lines[@]}]="$_glosa_trim"
-                    elif [[ "$_glosa_trim" == -* ]]; then
+                    else
                         _glosa_trim="${_glosa_trim%"${_glosa_trim##*[! ]}"}"
-                        _glosa_option_lines[${#_glosa_option_lines[@]}]="$_glosa_trim"
+                        if [[ "$_glosa_trim" == -* ]]; then
+                            _glosa_option_lines[${#_glosa_option_lines[@]}]="$_glosa_trim"
+                        elif (( ${#_glosa_option_lines[@]} )); then
+                            # A wrapped description (it may hold the default).
+                            _glosa_option_lines[${#_glosa_option_lines[@]} - 1]+="  $_glosa_trim"
+                        fi
                     fi
                     continue
                     ;;
@@ -957,21 +1022,34 @@ _glosa_value_of() {
     esac
 }
 
-# Builds "name=value" or "name=(items)" shell code for variable <v> into
-# _glosa_code, with every value quoted by printf %q.
+# Quotes <value> for eval inside single quotes into _glosa_q. Unlike
+# printf %q, the result is identical in every Bash version: Bash 3.2's %q
+# leaves "~" unescaped, so the eval would expand it.
+# usage: _glosa_quote <value>
+_glosa_quote() {
+    local _glosa_sq="'" _glosa_esc="'\''"
+    # Unquoted on purpose: Bash 3.2 keeps the inner quotes of the replacement
+    # when the whole expansion is double-quoted. Assignments do not split.
+    _glosa_q=${1//"$_glosa_sq"/"$_glosa_esc"}
+    _glosa_q="'$_glosa_q'"
+}
+
+# Builds "name='value'" shell code for variable <v> into _glosa_code. Lists
+# become "name=()" followed by one "name[i]='item'" line per item: Bash 3.2
+# corrupts \001 bytes inside an eval'd compound assignment.
 # usage: _glosa_code_for <v>
 _glosa_code_for() {
-    local _glosa_item _glosa_q
+    local _glosa_item _glosa_i=0
     _glosa_value_of "$1"
     if [[ "${_glosa_v_kind[$1]}" == list ]]; then
-        _glosa_code="${_glosa_v_name[$1]}=("
+        _glosa_code="${_glosa_v_name[$1]}=()"
         for _glosa_item in ${_glosa_items[@]+"${_glosa_items[@]}"}; do
-            printf -v _glosa_q '%q' "$_glosa_item"
-            _glosa_code+=" $_glosa_q"
+            _glosa_quote "$_glosa_item"
+            _glosa_code+=$'\n'"${_glosa_v_name[$1]}[$_glosa_i]=$_glosa_q"
+            _glosa_i=$((_glosa_i + 1))
         done
-        _glosa_code+=" )"
     else
-        printf -v _glosa_q '%q' "$_glosa_value"
+        _glosa_quote "$_glosa_value"
         _glosa_code="${_glosa_v_name[$1]}=$_glosa_q"
     fi
 }
@@ -1006,6 +1084,20 @@ _glosa_shell_leave() {
 # the help text itself is invalid.
 # usage: glosa::parse [--version <version>] <help> [args...]
 glosa::parse() {
+    _glosa_parse_body "$@"
+    # Printing and exiting happen here, after the body's locals (LC_ALL, IFS)
+    # are gone, so the caller's EXIT trap sees the caller's own state.
+    case "$_glosa_status" in
+        ok) return 0 ;;
+        help|version) printf '%s\n' "$_glosa_out"; exit 0 ;;
+        1) printf '%s\n\n%s\n' "$_glosa_err_msg" "$_glosa_usage_block" >&2; exit 1 ;;
+        *) printf 'glosa: invalid help text: %s\n' "$_glosa_err_msg" >&2; exit 2 ;;
+    esac
+}
+
+# Does the work of glosa::parse: runs every phase and, on success, assigns
+# the variables. Sets _glosa_status, and _glosa_out to the text to print.
+_glosa_parse_body() {
     # The C locale makes string operations much faster in Bash 3.2; "local"
     # restores the caller's locale on return.
     local LC_ALL=C IFS=$' \t\n' _glosa_version="" _glosa_help _glosa_v=0
@@ -1017,51 +1109,36 @@ glosa::parse() {
     (( $# )) && shift
     _glosa_shell_enter
     _glosa_run "$_glosa_version" "$_glosa_help" "$@"
-    case "$_glosa_status" in
-        ok)
-            while (( _glosa_v < _glosa_v_n )); do
-                case "${_glosa_v_kind[_glosa_v]}" in
-                    flag|count)
-                        printf -v "${_glosa_v_name[_glosa_v]}" '%s' "${_glosa_r_val[_glosa_v]}"
-                        ;;
-                    value)
-                        _glosa_value_of "$_glosa_v"
-                        printf -v "${_glosa_v_name[_glosa_v]}" '%s' "$_glosa_value"
-                        ;;
-                    *)
-                        _glosa_code_for "$_glosa_v"
-                        eval "$_glosa_code"
-                        ;;
-                esac
-                _glosa_v=$((_glosa_v + 1))
-            done
-            _glosa_shell_leave
-            return 0
-            ;;
-        help)
-            printf '%s\n' "$_glosa_help"
-            exit 0
-            ;;
-        version)
-            printf '%s\n' "$_glosa_version"
-            exit 0
-            ;;
-        1)
-            printf '%s\n\n%s\n' "$_glosa_err_msg" "$_glosa_usage_block" >&2
-            exit 1
-            ;;
-        *)
-            printf 'glosa: invalid help text: %s\n' "$_glosa_err_msg" >&2
-            exit 2
-            ;;
-    esac
+    _glosa_out="$_glosa_help"
+    [[ "$_glosa_status" == version ]] && _glosa_out="$_glosa_version"
+    if [[ "$_glosa_status" == ok ]]; then
+        while (( _glosa_v < _glosa_v_n )); do
+            case "${_glosa_v_kind[_glosa_v]}" in
+                flag|count)
+                    printf -v "${_glosa_v_name[_glosa_v]}" '%s' "${_glosa_r_val[_glosa_v]}"
+                    ;;
+                value)
+                    _glosa_value_of "$_glosa_v"
+                    printf -v "${_glosa_v_name[_glosa_v]}" '%s' "$_glosa_value"
+                    ;;
+                *)
+                    # Values never enter the eval text: only the validated
+                    # name and the expansion of _glosa_items do.
+                    _glosa_value_of "$_glosa_v"
+                    eval "${_glosa_v_name[_glosa_v]}=(\${_glosa_items[@]+\"\${_glosa_items[@]}\"})"
+                    ;;
+            esac
+            _glosa_v=$((_glosa_v + 1))
+        done
+    fi
+    _glosa_shell_leave
 }
 
 # Command-line entry point: prints shell code for eval, ending in "exit N"
 # for help, version and errors.
 # usage: glosa [--version <version>] -h <help> : [args...]
 glosa::main() {
-    local LC_ALL=C IFS=$' \t\n' _glosa_version="" _glosa_help _glosa_v=0 _glosa_q
+    local LC_ALL=C IFS=$' \t\n' _glosa_version="" _glosa_help _glosa_v=0
     if [[ "${1-}" == "--version" && $# -ge 2 ]]; then
         _glosa_version="$2"
         shift 2
@@ -1085,7 +1162,7 @@ glosa::main() {
             ;;
         help|version)
             [[ "$_glosa_status" == version ]] && _glosa_help="$_glosa_version"
-            printf -v _glosa_q '%q' "$_glosa_help"
+            _glosa_quote "$_glosa_help"
             printf "printf '%%s\\\\n' %s\nexit 0\n" "$_glosa_q"
             return 0
             ;;

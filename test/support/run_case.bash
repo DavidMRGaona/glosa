@@ -18,7 +18,7 @@ _rc_esc() {
 }
 
 _rc_dump() {
-    local _rc_rc="$1" _rc_name _rc_decl _rc_i _rc_len
+    local _rc_rc="$1" _rc_name _rc_decl _rc_i _rc_len _rc_ref
     trap - EXIT
     set +eu
     exec 1>&3 2>&4
@@ -32,7 +32,9 @@ _rc_dump() {
             printf '%s[]=%s\n' "$_rc_name" "$_rc_len"
             _rc_i=0
             while (( _rc_i < _rc_len )); do
-                eval "printf '%s[%s]=%s\n' \"\$_rc_name\" \"\$_rc_i\" \"\$(_rc_esc \"\${${_rc_name}[$_rc_i]}\")\""
+                # Indirect expansion, not eval: Bash 3.2's eval mangles \001.
+                _rc_ref="${_rc_name}[$_rc_i]"
+                printf '%s[%s]=%s\n' "$_rc_name" "$_rc_i" "$(_rc_esc "${!_rc_ref}")"
                 _rc_i=$((_rc_i + 1))
             done
         else

@@ -61,16 +61,18 @@ eval "$(glosa -h "$help" : "$@")"
 eval "$(glosa --version "1.2.3" -h "$help" : "$@")"
 ```
 
-Every value in the printed code is quoted with `printf %q`, so no argument
-can inject code into the `eval`. The test suite checks this with quotes,
+Every value in the printed code is single-quoted, so no argument can inject
+code into the `eval`, and values come through byte for byte (`~` included,
+which Bash 3.2's `printf %q` would leave to tilde expansion). The test suite checks this with quotes,
 `$()`, backticks, `;`, newlines and glob characters.
 
 ## Supported syntax
 
 The help text needs a `Usage:` section. Its first word on each line is the
 program name. Any section whose header ends in `options:` (`Options:`,
-`Global options:`…) describes options. A section ends at the first line
-that is not indented.
+`Global options:`…) describes options. An option's description may wrap
+onto indented lines, and `[default: …]` may sit on any of them. A section
+ends at the first blank or unindented line.
 
 | Element | Example | Variable | Value |
 |---|---|---|---|
@@ -90,7 +92,10 @@ that is not indented.
 
 Name rules: `--skip-setup` becomes `skip_setup`, `<file-name>` becomes
 `file_name`, and a short-only `-t` becomes `_t`. Names must be valid shell
-identifiers and must not start with `_glosa_`.
+identifiers and must not start with `_glosa_`. Names that Bash treats
+specially are rejected as an invalid help text, because assigning them would
+break the shell or be lost: `_` (so `[-]`), `PATH`, `IFS`, `HOME`, `PWD`,
+`UID`, `LANG`, `LC_*`, `BASH_*`, `PS1`…
 
 On the command line, glosa accepts `--width=800`, `--width 800`, `-w800`
 and `-w 800`. It also accepts stacked shorts (`-kv`) and unique prefixes of
@@ -106,7 +111,7 @@ long options (`--wid 800`).
 - `-h` / `--help` print the whole help text and exit 0 **when they are the
   first argument**. The same goes for `--version` when you pass a version.
 - glosa saves and restores the caller's `set -e`, `set -u`, `set -f`,
-  `IFS` and `nocasematch`.
+  `IFS`, `nocasematch` and locale, also before it exits on `-h` or an error.
 
 ### Exit codes
 

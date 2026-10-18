@@ -16,7 +16,8 @@ First release.
 - `glosa::parse [--version <v>] <help> [args...]`: a source mode that assigns
   variables directly, with no subprocesses.
 - `glosa [--version <v>] -h <help> : [args...]`: a CLI mode that prints
-  shell code for `eval`. Every value is quoted with `printf %q`.
+  shell code for `eval`. Every value is single-quoted, so values (including
+  `~`) come through unchanged on every Bash version.
 - Usage syntax:
   - required and optional positionals (`<x>`, `[<x>]`, `FILE`) and commands;
   - several usage lines;
@@ -35,6 +36,8 @@ First release.
 - Usage errors print a message and the `Usage:` block to stderr and exit 1.
   An invalid help text exits 2 with `glosa: invalid help text: …`.
 - Every declared variable is always defined, so scripts can use `set -u`.
+- Names Bash treats specially (`PATH`, `IFS`, `_`, `LC_*`…) are rejected.
+- Thousands of arguments parse in well under a second.
 - The caller's `set -e`, `set -u`, `set -f`, `IFS`, `nocasematch` and
   locale are preserved.
 - Works on Bash 3.2 through 5.x. Tested on macOS and Linux.
