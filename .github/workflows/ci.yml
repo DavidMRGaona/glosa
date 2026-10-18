@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - run: make lint
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install bats-core bash
+      - name: Test with /bin/bash (3.2) and Homebrew bash (5.x)
+        run: make test-all
+
+  ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: git clone --depth 1 https://github.com/bats-core/bats-core.git "$RUNNER_TEMP/bats"
+      - name: Test with the system bash (5.x)
+        run: PATH="$RUNNER_TEMP/bats/bin:$PATH" make test
+      - name: Test with bash 3.2
+        run: |
+          docker run --rm -v "$PWD:/src" -v "$RUNNER_TEMP/bats:/bats" -w /src bash:3.2 \
+            bash -c 'bash --version | head -1 && /bats/bin/bats test'
