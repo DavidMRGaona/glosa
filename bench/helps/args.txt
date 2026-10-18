@@ -1,0 +1,5 @@
+resize pic.jpg --small
+projects foo --pick
+store purge /x
+dispatcher ctx cmd a b
+feat -q a.txt

@@ -1,0 +1,4 @@
+List known projects
+
+Usage:
+  projects [<filter>] [--pick]

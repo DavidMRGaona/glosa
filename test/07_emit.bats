@@ -221,3 +221,17 @@ tag[1]=b" ]
     run grep -nE '\$\([^(]|`| \| ' <(grep -vE '^[[:space:]]*#' "$GLOSA")
     [ "$status" -eq 1 ]
 }
+
+@test "the caller's locale is untouched and non-ASCII values survive" {
+    run env LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 "$GLOSA_TEST_BASH" -c '
+        source "$1"
+        glosa::parse "$2" "año ñu"
+        x="é"
+        echo "${#x}|$LC_ALL|$text"
+        eval "$(bash "$1" -h "$2" : "café")"
+        echo "$text"
+    ' _ "$GLOSA" "$SAY"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "1|en_US.UTF-8|año ñu" ]
+    [ "${lines[1]}" = "café" ]
+}
