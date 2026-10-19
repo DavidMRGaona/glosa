@@ -14,8 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A usage line that does not start with the program name now continues the
   previous line, as in docopt. Before, a wrapped pattern made the help text
   invalid.
-- Options written on the header line itself (`Options: -v  Verbose`) are
-  read, and any header that contains `options:` starts an options section.
+- An option written on the header line itself, with its description
+  (`Options: -v  Verbose`), is read, and any header that contains
+  `options:` starts an options section.
 - Long options named in usage patterns are looked up by their exact name.
   Before, `--fo` next to declared `--foo` and `--fob` made the help text
   invalid as an ambiguous prefix.

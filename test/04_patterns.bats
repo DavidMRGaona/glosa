@@ -209,3 +209,13 @@ Options:
     [ "$_glosa_err_code" -eq 2 ]
     [ "$_glosa_err_msg" = "invalid variable name '_é'" ]
 }
+
+@test "options mentioned in prose do not change declared options" {
+    parse 'Usage: prog [options]
+
+Supported options: --verbose and --quiet
+
+Options:
+  -q --quiet  Quiet'
+    [ "$(kind quiet)" = "flag" ]
+}

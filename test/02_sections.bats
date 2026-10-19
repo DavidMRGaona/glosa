@@ -97,6 +97,13 @@ Options: all of them are optional
     [ "${_glosa_option_lines[0]}" = "-q  Quiet" ]
 }
 
+@test "prose after the options header is not an option" {
+    _glosa_sections 'Usage: prog [options]
+
+Common options: -v, -q.'
+    [ "${#_glosa_option_lines[@]}" -eq 0 ]
+}
+
 @test "usage block is printed verbatim" {
     _glosa_sections 'Usage:
    run

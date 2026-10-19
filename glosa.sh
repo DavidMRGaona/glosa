@@ -17,8 +17,9 @@ GLOSA_VERSION="0.1.1"
 _glosa_upper=ABCDEFGHIJKLMNOPQRSTUVWXYZ
 _glosa_lower=abcdefghijklmnopqrstuvwxyz
 _glosa_digit=0123456789
-# UTF-8 continuation bytes. glosa runs in the C locale, where "${x:0:1}" takes
-# one byte and would split a non-ASCII letter.
+# UTF-8 lead and continuation bytes. glosa runs in the C locale, where
+# "${x:0:1}" takes one byte and would split a non-ASCII letter.
+_glosa_utf8_lead=$'\xc2\xc3\xc4\xc5\xc6\xc7\xc8\xc9\xca\xcb\xcc\xcd\xce\xcf\xd0\xd1\xd2\xd3\xd4\xd5\xd6\xd7\xd8\xd9\xda\xdb\xdc\xdd\xde\xdf\xe0\xe1\xe2\xe3\xe4\xe5\xe6\xe7\xe8\xe9\xea\xeb\xec\xed\xee\xef\xf0\xf1\xf2\xf3\xf4'
 _glosa_utf8_tail=$'\x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a\x8b\x8c\x8d\x8e\x8f\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9a\x9b\x9c\x9d\x9e\x9f\xa0\xa1\xa2\xa3\xa4\xa5\xa6\xa7\xa8\xa9\xaa\xab\xac\xad\xae\xaf\xb0\xb1\xb2\xb3\xb4\xb5\xb6\xb7\xb8\xb9\xba\xbb\xbc\xbd\xbe\xbf'
 
 # ---------------------------------------------------------------------------
@@ -384,7 +385,7 @@ _glosa_p_atom() {
             while [[ -n "$_glosa_tok" ]]; do
                 _glosa_short="-${_glosa_tok:0:1}"
                 _glosa_tok="${_glosa_tok:1}"
-                while [[ "$_glosa_tok" == ["$_glosa_utf8_tail"]* ]]; do
+                while [[ "$_glosa_short" == -["$_glosa_utf8_lead"]* && "$_glosa_tok" == ["$_glosa_utf8_tail"]* ]]; do
                     _glosa_short+="${_glosa_tok:0:1}"
                     _glosa_tok="${_glosa_tok:1}"
                 done
@@ -667,7 +668,9 @@ _glosa_tokenize() {
                 while [[ -n "$_glosa_chars" ]]; do
                     _glosa_name="-${_glosa_chars:0:1}"
                     _glosa_chars="${_glosa_chars:1}"
-                    while [[ "$_glosa_chars" == ["$_glosa_utf8_tail"]* ]]; do
+                    # Only after a lead byte: a value attached to the option
+                    # may start with any byte.
+                    while [[ "$_glosa_name" == -["$_glosa_utf8_lead"]* && "$_glosa_chars" == ["$_glosa_utf8_tail"]* ]]; do
                         _glosa_name+="${_glosa_chars:0:1}"
                         _glosa_chars="${_glosa_chars:1}"
                     done
@@ -978,10 +981,13 @@ _glosa_sections() {
             fi
         elif [[ "$_glosa_trim" == *[Oo][Pp][Tt][Ii][Oo][Nn][Ss]:* ]]; then
             _glosa_state=options
-            # The first option may share the header line (docopt rule).
-            _glosa_trim="${_glosa_trim#*:}"
+            # The first option may share the header line. It needs its
+            # description, so prose such as "options: -v, -q." is not one.
+            _glosa_trim="${_glosa_trim#*[Oo][Pp][Tt][Ii][Oo][Nn][Ss]:}"
             _glosa_trim="${_glosa_trim#"${_glosa_trim%%[! ]*}"}"
-            [[ "$_glosa_trim" == -* ]] && _glosa_option_lines[${#_glosa_option_lines[@]}]="$_glosa_trim"
+            if [[ "$_glosa_trim" == -*"  "* ]]; then
+                _glosa_option_lines[${#_glosa_option_lines[@]}]="$_glosa_trim"
+            fi
         fi
     done
     if [[ -z "$_glosa_usage_block" ]]; then

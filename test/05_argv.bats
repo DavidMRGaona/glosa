@@ -103,6 +103,12 @@ pos|" ]
     [ "$_glosa_err_msg" = "Unknown option: '-é'" ]
 }
 
+@test "an attached value may start with a non-UTF-8 byte" {
+    local LC_ALL=C
+    _glosa_tokenize -o$'\xb0'C
+    [ "$(tokens)" = "opt|output|"$'\xb0'"C" ]
+}
+
 @test "missing value" {
     _glosa_tokenize --output || true
     [ "$_glosa_err_code" -eq 1 ]
