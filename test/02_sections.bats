@@ -60,6 +60,25 @@ Global options:
     [ "${_glosa_option_lines[1]}" = "-v  Verbose" ]
 }
 
+@test "options can start on the header line" {
+    _glosa_sections 'Usage: prog [options]
+
+Options: -v  Verbose
+  -q  Quiet'
+    [ "${#_glosa_option_lines[@]}" -eq 2 ]
+    [ "${_glosa_option_lines[0]}" = "-v  Verbose" ]
+    [ "${_glosa_option_lines[1]}" = "-q  Quiet" ]
+}
+
+@test "text after the options header is not an option" {
+    _glosa_sections 'Usage: prog [options]
+
+Options: all of them are optional
+  -q  Quiet'
+    [ "${#_glosa_option_lines[@]}" -eq 1 ]
+    [ "${_glosa_option_lines[0]}" = "-q  Quiet" ]
+}
+
 @test "usage block is printed verbatim" {
     _glosa_sections 'Usage:
    run

@@ -952,8 +952,12 @@ _glosa_sections() {
             _glosa_trim="${_glosa_trim:6}"
             _glosa_trim="${_glosa_trim#"${_glosa_trim%%[! ]*}"}"
             [[ -n "$_glosa_trim" ]] && _glosa_usage_lines[${#_glosa_usage_lines[@]}]="$_glosa_trim"
-        elif [[ "$_glosa_trim" == *[Oo][Pp][Tt][Ii][Oo][Nn][Ss]: ]]; then
+        elif [[ "$_glosa_trim" == *[Oo][Pp][Tt][Ii][Oo][Nn][Ss]:* ]]; then
             _glosa_state=options
+            # The first option may share the header line (docopt rule).
+            _glosa_trim="${_glosa_trim#*:}"
+            _glosa_trim="${_glosa_trim#"${_glosa_trim%%[! ]*}"}"
+            [[ "$_glosa_trim" == -* ]] && _glosa_option_lines[${#_glosa_option_lines[@]}]="$_glosa_trim"
         fi
     done
     if [[ -z "$_glosa_usage_block" ]]; then
