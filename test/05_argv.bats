@@ -94,6 +94,15 @@ pos|" ]
     [ "$_glosa_err_msg" = "Unknown option: '-x'" ]
 }
 
+@test "a non-ASCII short option is reported whole" {
+    # glosa runs in the C locale, where "é" is two bytes.
+    local LC_ALL=C
+    _glosa_tokenize -é || true
+    [ "$_glosa_err_msg" = "Unknown option: '-é'" ]
+    _glosa_tokenize -qé || true
+    [ "$_glosa_err_msg" = "Unknown option: '-é'" ]
+}
+
 @test "missing value" {
     _glosa_tokenize --output || true
     [ "$_glosa_err_code" -eq 1 ]

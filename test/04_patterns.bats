@@ -202,3 +202,10 @@ Options:
     [ "$(root 0)" = "(seq (option fo))" ]
     [ "$(kind fo)" = "flag" ]
 }
+
+@test "a non-ASCII short option in a pattern is reported whole" {
+    local LC_ALL=C
+    parse 'Usage: prog -é' || true
+    [ "$_glosa_err_code" -eq 2 ]
+    [ "$_glosa_err_msg" = "invalid variable name '_é'" ]
+}

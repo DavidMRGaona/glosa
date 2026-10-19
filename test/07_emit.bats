@@ -117,6 +117,14 @@ args[1]=$(glosa_esc "$v")"
     [ "$output" = "exit=1" ]
 }
 
+@test "a usage error names a non-ASCII option whole in both modes" {
+    GLOSA_DUMP=""
+    glosa_both "$RESIZE" pic.jpg -é
+    [ "$output" = "exit=1" ]
+    [ "$(head -1 "$BATS_TEST_TMPDIR/err.cli")" = "Unknown option: '-é'" ]
+    [ "$(head -1 "$BATS_TEST_TMPDIR/err.src")" = "Unknown option: '-é'" ]
+}
+
 @test "help text with shell syntax is printed literally" {
     local help='Usage: prog <x>
 

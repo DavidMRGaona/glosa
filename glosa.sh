@@ -17,6 +17,9 @@ GLOSA_VERSION="0.1.0"
 _glosa_upper=ABCDEFGHIJKLMNOPQRSTUVWXYZ
 _glosa_lower=abcdefghijklmnopqrstuvwxyz
 _glosa_digit=0123456789
+# UTF-8 continuation bytes. glosa runs in the C locale, where "${x:0:1}" takes
+# one byte and would split a non-ASCII letter.
+_glosa_utf8_tail=$'\x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a\x8b\x8c\x8d\x8e\x8f\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9a\x9b\x9c\x9d\x9e\x9f\xa0\xa1\xa2\xa3\xa4\xa5\xa6\xa7\xa8\xa9\xaa\xab\xac\xad\xae\xaf\xb0\xb1\xb2\xb3\xb4\xb5\xb6\xb7\xb8\xb9\xba\xbb\xbc\xbd\xbe\xbf'
 
 # ---------------------------------------------------------------------------
 # State
@@ -322,7 +325,7 @@ _glosa_p_seq() {
 # Parses one atom: a group, an option, an argument or a command. Sets
 # _glosa_p_nodes (possibly several ids, for stacked short options).
 _glosa_p_atom() {
-    local _glosa_tok="${_glosa_tk[_glosa_tp]}" _glosa_inner _glosa_close _glosa_arg _glosa_nodes=""
+    local _glosa_tok="${_glosa_tk[_glosa_tp]}" _glosa_inner _glosa_close _glosa_arg _glosa_nodes="" _glosa_short
     _glosa_tp=$((_glosa_tp + 1))
     case "$_glosa_tok" in
         "("|"[")
@@ -379,11 +382,16 @@ _glosa_p_atom() {
         -?*)
             _glosa_tok="${_glosa_tok#-}"
             while [[ -n "$_glosa_tok" ]]; do
-                _glosa_find_short "-${_glosa_tok:0:1}"
-                if (( _glosa_found < 0 )); then
-                    _glosa_add_option "-${_glosa_tok:0:1}" "" 0 "" || return
-                fi
+                _glosa_short="-${_glosa_tok:0:1}"
                 _glosa_tok="${_glosa_tok:1}"
+                while [[ "$_glosa_tok" == ["$_glosa_utf8_tail"]* ]]; do
+                    _glosa_short+="${_glosa_tok:0:1}"
+                    _glosa_tok="${_glosa_tok:1}"
+                done
+                _glosa_find_short "$_glosa_short"
+                if (( _glosa_found < 0 )); then
+                    _glosa_add_option "$_glosa_short" "" 0 "" || return
+                fi
                 if (( _glosa_o_argc[_glosa_found] )); then
                     [[ -z "$_glosa_tok" ]] && _glosa_p_option_arg
                     _glosa_tok=""
@@ -659,6 +667,10 @@ _glosa_tokenize() {
                 while [[ -n "$_glosa_chars" ]]; do
                     _glosa_name="-${_glosa_chars:0:1}"
                     _glosa_chars="${_glosa_chars:1}"
+                    while [[ "$_glosa_chars" == ["$_glosa_utf8_tail"]* ]]; do
+                        _glosa_name+="${_glosa_chars:0:1}"
+                        _glosa_chars="${_glosa_chars:1}"
+                    done
                     _glosa_find_short "$_glosa_name"
                     if (( _glosa_found < 0 )); then
                         _glosa_fail 1 "Unknown option: '$_glosa_name'"
