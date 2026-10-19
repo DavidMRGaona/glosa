@@ -131,7 +131,7 @@ Costs $HOME and `id` and $(id) and \n'
     run "$GLOSA_TEST_BASH" -c 'source "$1"; glosa::parse --version 1.2.3 "Usage: prog [<x>]" --version' _ "$GLOSA"
     [ "$status" -eq 0 ]
     [ "$output" = "1.2.3" ]
-    run "$GLOSA_TEST_BASH" -c 'eval "$(bash "$1" --version 1.2.3 -h "Usage: prog [<x>]" : --version)"' _ "$GLOSA"
+    run "$GLOSA_TEST_BASH" -c 'eval "$("$BASH" "$1" --version 1.2.3 -h "Usage: prog [<x>]" : --version)"' _ "$GLOSA"
     [ "$status" -eq 0 ]
     [ "$output" = "1.2.3" ]
 }
@@ -234,7 +234,7 @@ tag[1]=b" ]
         glosa::parse "$2" "año ñu"
         x="é"
         echo "${#x}|$LC_ALL|$text"
-        eval "$(bash "$1" -h "$2" : "café")"
+        eval "$("$BASH" "$1" -h "$2" : "café")"
         echo "$text"
     ' _ "$GLOSA" "$SAY"
     [ "$status" -eq 0 ]
