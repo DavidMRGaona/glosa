@@ -192,3 +192,13 @@ $FEAT_OPTIONS"
     [ "$(kind a)" = "value" ]
     [ "$(kind b)" = "list" ]
 }
+
+@test "long options in patterns are looked up by their exact name" {
+    parse 'Usage: prog --fo
+
+Options:
+  --foo  Foo
+  --fob  Fob'
+    [ "$(root 0)" = "(seq (option fo))" ]
+    [ "$(kind fo)" = "flag" ]
+}

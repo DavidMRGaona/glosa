@@ -363,8 +363,9 @@ _glosa_p_atom() {
                 _glosa_arg=1
                 _glosa_tok="${_glosa_tok%%=*}"
             fi
-            _glosa_find_long "$_glosa_tok" || return
-            if (( _glosa_found < 0 )) || [[ "${_glosa_o_long[_glosa_found]}" != "$_glosa_tok" ]]; then
+            # Exact names only: abbreviations are for the command line.
+            _glosa_find_exact "$_glosa_tok"
+            if (( _glosa_found < 0 )); then
                 _glosa_add_option "" "$_glosa_tok" "$_glosa_arg" "" || return
             elif (( _glosa_arg )); then
                 _glosa_add_option "" "$_glosa_tok" 1 "" || return
