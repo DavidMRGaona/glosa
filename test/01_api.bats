@@ -7,7 +7,7 @@ load test_helper
     run "$GLOSA_TEST_BASH" -c "source '$GLOSA'; declare -F glosa::parse; echo \$GLOSA_VERSION"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" = "glosa::parse" ]
-    [ "${lines[1]}" = "0.1.0" ]
+    [ "${lines[1]}" = "0.1.1" ]
 }
 
 @test "sourcing does not run the CLI" {

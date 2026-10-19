@@ -10,7 +10,7 @@
 #   eval "$(glosa -h "$help" : "$@")"
 
 # shellcheck disable=SC2034 # public: read by callers
-GLOSA_VERSION="0.1.0"
+GLOSA_VERSION="0.1.1"
 
 # Explicit character sets: ranges like [A-Z] follow the locale's collation in
 # Bash 3.2 and would match lowercase or accented letters.

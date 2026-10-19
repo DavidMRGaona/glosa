@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-19
+
+### Fixed
+
+- A usage line that does not start with the program name now continues the
+  previous line, as in docopt. Before, a wrapped pattern made the help text
+  invalid.
+- Options written on the header line itself (`Options: -v  Verbose`) are
+  read, and any header that contains `options:` starts an options section.
+- Long options named in usage patterns are looked up by their exact name.
+  Before, `--fo` next to declared `--foo` and `--fob` made the help text
+  invalid as an ambiguous prefix.
+- Errors name a non-ASCII short option whole (`'-é'`), not by its first
+  byte.
+
 ## [0.1.0] - 2026-10-18
 
 First release.
@@ -42,5 +57,6 @@ First release.
   locale are preserved.
 - Works on Bash 3.2 through 5.x. Tested on macOS and Linux.
 
-[Unreleased]: https://github.com/DavidMRGaona/glosa/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/DavidMRGaona/glosa/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/DavidMRGaona/glosa/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/DavidMRGaona/glosa/releases/tag/v0.1.0

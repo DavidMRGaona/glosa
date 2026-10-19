@@ -40,7 +40,7 @@ Pick one:
   `$(brew --prefix)/share/glosa/glosa.sh`.
 - **Git submodule:** `git submodule add https://github.com/DavidMRGaona/glosa.git vendor/glosa`
 - **Copy the file:**
-  `curl -fsSLo glosa.sh https://raw.githubusercontent.com/DavidMRGaona/glosa/v0.1.0/glosa.sh`
+  `curl -fsSLo glosa.sh https://raw.githubusercontent.com/DavidMRGaona/glosa/v0.1.1/glosa.sh`
 
 ## Usage
 
@@ -68,9 +68,11 @@ which Bash 3.2's `printf %q` would leave to tilde expansion). The test suite che
 
 ## Supported syntax
 
-The help text needs a `Usage:` section. Its first word on each line is the
-program name. Any section whose header ends in `options:` (`Options:`,
-`Global options:`…) describes options. An option's description may wrap
+The help text needs a `Usage:` section. Each usage line starts with the
+program name; a line that starts with anything else continues the previous
+one, so long patterns can wrap. Any section whose header contains
+`options:` (`Options:`, `Global options:`…) describes options, and the
+first option may share the header line. An option's description may wrap
 onto indented lines, and `[default: …]` may sit on any of them. A section
 ends at the first blank or unindented line.
 
