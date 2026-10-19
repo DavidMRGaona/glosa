@@ -236,8 +236,16 @@ tag[1]=b" ]
     [ "$status" -eq 1 ]
 }
 
+# Prints a UTF-8 locale this system has: neither en_US.UTF-8 nor C.UTF-8
+# exists everywhere.
+utf8_locale() {
+    locale -a 2>/dev/null | grep -m1 -iE '^(en_US|C)\.utf-?8$'
+}
+
 @test "the caller's locale is untouched and non-ASCII values survive" {
-    run env LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 "$GLOSA_TEST_BASH" -c '
+    local loc
+    loc="$(utf8_locale)" || skip "no UTF-8 locale"
+    run env LANG="$loc" LC_ALL="$loc" "$GLOSA_TEST_BASH" -c '
         source "$1"
         glosa::parse "$2" "año ñu"
         x="é"
@@ -246,7 +254,7 @@ tag[1]=b" ]
         echo "$text"
     ' _ "$GLOSA" "$SAY"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" = "1|en_US.UTF-8|año ñu" ]
+    [ "${lines[0]}" = "1|$loc|año ñu" ]
     [ "${lines[1]}" = "café" ]
 }
 
