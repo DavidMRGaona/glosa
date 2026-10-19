@@ -224,3 +224,18 @@ Options:
     [ "$count" -eq 5000 ]
     [ "$last" = x4999 ]
 }
+
+@test "a wrapped usage line is one pattern" {
+    local help='Usage:
+  prog list
+  prog [--foo] [--bar]
+       [--baz] <file>'
+    match "$help" list
+    [ "$(val list)" = true ]
+    [ "$(val file)" = "" ]
+    match "$help" --baz f.txt
+    [ "$(val baz)" = true ]
+    [ "$(val file)" = f.txt ]
+    run match "$help"
+    [ "$status" -eq 1 ]
+}

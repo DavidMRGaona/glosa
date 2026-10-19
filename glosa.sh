@@ -904,7 +904,7 @@ _glosa_fail() {
 # Sets _glosa_usage_block, _glosa_usage_lines[] and _glosa_option_lines[].
 # usage: _glosa_sections <help>
 _glosa_sections() {
-    local _glosa_rest="$1"$'\n' _glosa_line _glosa_trim _glosa_state=none
+    local _glosa_rest="$1"$'\n' _glosa_line _glosa_trim _glosa_state=none _glosa_prog=""
     _glosa_usage_block=""
     _glosa_usage_lines=()
     _glosa_option_lines=()
@@ -926,7 +926,16 @@ _glosa_sections() {
                     if [[ "$_glosa_state" == usage ]]; then
                         _glosa_usage_block+=$'\n'"$_glosa_line"
                         _glosa_trim="${_glosa_trim%"${_glosa_trim##*[! ]}"}"
-                        [[ -n "$_glosa_trim" ]] && _glosa_usage_lines[${#_glosa_usage_lines[@]}]="$_glosa_trim"
+                        if [[ -z "$_glosa_prog" ]]; then
+                            _glosa_prog="${_glosa_trim%% *}"
+                            _glosa_usage_lines[0]="$_glosa_trim"
+                        elif [[ "${_glosa_trim%% *}" == "$_glosa_prog" ]]; then
+                            _glosa_usage_lines[${#_glosa_usage_lines[@]}]="$_glosa_trim"
+                        else
+                            # A line that does not start with the program
+                            # name wraps the previous one (docopt rule).
+                            _glosa_usage_lines[${#_glosa_usage_lines[@]} - 1]+=" $_glosa_trim"
+                        fi
                     else
                         _glosa_trim="${_glosa_trim%"${_glosa_trim##*[! ]}"}"
                         if [[ "$_glosa_trim" == -* ]]; then
@@ -951,7 +960,10 @@ _glosa_sections() {
             _glosa_usage_block="$_glosa_line"
             _glosa_trim="${_glosa_trim:6}"
             _glosa_trim="${_glosa_trim#"${_glosa_trim%%[! ]*}"}"
-            [[ -n "$_glosa_trim" ]] && _glosa_usage_lines[${#_glosa_usage_lines[@]}]="$_glosa_trim"
+            if [[ -n "$_glosa_trim" ]]; then
+                _glosa_prog="${_glosa_trim%% *}"
+                _glosa_usage_lines[0]="$_glosa_trim"
+            fi
         elif [[ "$_glosa_trim" == *[Oo][Pp][Tt][Ii][Oo][Nn][Ss]:* ]]; then
             _glosa_state=options
             # The first option may share the header line (docopt rule).

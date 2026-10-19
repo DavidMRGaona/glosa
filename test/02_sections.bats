@@ -27,6 +27,24 @@ Examples:
     [ "${_glosa_usage_lines[0]}" = "greet <name>" ]
 }
 
+@test "a usage line that does not start with the program name continues the previous one" {
+    _glosa_sections 'Usage:
+  prog [--foo] [--bar]
+       [--baz] <file>
+  prog list'
+    [ "${#_glosa_usage_lines[@]}" -eq 2 ]
+    [ "${_glosa_usage_lines[0]}" = "prog [--foo] [--bar] [--baz] <file>" ]
+    [ "${_glosa_usage_lines[1]}" = "prog list" ]
+}
+
+@test "the inline usage line sets the program name for the next lines" {
+    _glosa_sections 'Usage: prog add <x>
+         [--force]
+       prog rm <x>'
+    [ "${#_glosa_usage_lines[@]}" -eq 2 ]
+    [ "${_glosa_usage_lines[0]}" = "prog add <x> [--force]" ]
+}
+
 @test "case-insensitive header" {
     _glosa_sections 'USAGE:
   prog <x>'
