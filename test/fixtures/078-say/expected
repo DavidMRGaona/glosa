@@ -1,3 +1,3 @@
 exit=0
-enter=false
-text=a;b
+enter=true
+text=hi

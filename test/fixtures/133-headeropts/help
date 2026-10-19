@@ -1,0 +1,6 @@
+Clean a path
+
+Usage: clean [options] <path>
+
+Options: -n --dry-run  Only list files
+  -f --force  Do not ask

@@ -1,0 +1,9 @@
+Sync a directory
+
+Usage:
+  sync --dry
+  sync [--dry-run] [--dryer] <dir>
+
+Options:
+  --dry-run  Show what would change
+  --dryer    Dry harder

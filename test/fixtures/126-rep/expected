@@ -1,0 +1,6 @@
+exit=0
+_q=false
+_v=false
+file[]=1
+file[0]=a
+x=

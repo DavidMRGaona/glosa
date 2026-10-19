@@ -1,0 +1,12 @@
+exit=0
+_h=false
+args[]=6
+args[0]=$(id)
+args[1]=a;b
+args[2]=x"y
+args[3]=l1\nl2
+args[4]=back\\slash
+args[5]=*
+command=cmd
+context=ctx
+help=false

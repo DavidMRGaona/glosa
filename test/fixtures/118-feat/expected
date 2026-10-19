@@ -1,0 +1,14 @@
+exit=0
+_t=false
+_v=3
+add=false
+file=
+name[]=0
+output=out.txt
+port=8080
+quiet=false
+rest[]=0
+rm=false
+serve=true
+verbose_mode=false
+watch=false

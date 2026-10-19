@@ -1,14 +1,14 @@
 exit=0
 _t=false
-_v=3
+_v=0
 add=false
-file=
+file=a.txt
 name[]=0
 output=out.txt
 port=8080
 quiet=false
 rest[]=0
 rm=false
-serve=true
+serve=false
 verbose_mode=false
 watch=false

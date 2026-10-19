@@ -1,0 +1,17 @@
+exit=0
+_t=false
+_v=0
+add=true
+file=
+name[]=3
+name[0]=a
+name[1]=b
+name[2]=c
+output=out.txt
+port=8080
+quiet=false
+rest[]=0
+rm=false
+serve=false
+verbose_mode=false
+watch=false

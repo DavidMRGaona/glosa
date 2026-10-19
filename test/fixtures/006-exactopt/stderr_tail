@@ -1,0 +1,3 @@
+Usage:
+  sync --dry
+  sync [--dry-run] [--dryer] <dir>

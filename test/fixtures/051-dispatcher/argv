@@ -1,8 +1,4 @@
 ctx
 cmd
-$(id)
-a;b
-x"y
-l1\nl2
-back\\slash
-*
+a
+b c

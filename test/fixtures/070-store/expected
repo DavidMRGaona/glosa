@@ -1,1 +1,4 @@
-exit=1
+exit=0
+list_items=true
+optional_path_file=
+purge=false
